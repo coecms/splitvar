@@ -40,17 +40,38 @@ import itertools as it
 sys.path.append('..')
 sys.path.append('.')
 
-from splitvar import splitbytime
+from splitvar import splitbytime, to_timedelta
 
 verbose = True
+
+def test_totimedelta():
+
+    ## print(to_timedelta('1D'),pd.Timedelta('1 days'))
+    ## print(to_timedelta('1MS'),pd.Timedelta('31 days'))
+    ## print(to_timedelta('1M'),pd.Timedelta('28 days'))
+    ## print(to_timedelta('1AS'),pd.Timedelta('365 days'))
+    ## print(to_timedelta('1A'),pd.Timedelta('365 days'))
+
+    assert(to_timedelta('1D') == pd.Timedelta('1 days'))
+    # Because this routine calculates a times series from the
+    # beginning of 1970, the result changes if the frequency
+    # paramter is defined at the beginning or the end of the
+    # month
+    assert(to_timedelta('1MS') == pd.Timedelta('31 days'))
+    assert(to_timedelta('1M') == pd.Timedelta('28 days'))
+    assert(to_timedelta('1M') == pd.Timedelta('28 days'))
+    # But there is no difference between 1A and 1AS, as there
+    # is no difference in the number of days in 1970 and 1971
+    assert(to_timedelta('1AS') == pd.Timedelta('365 days'))
+    assert(to_timedelta('1A') == pd.Timedelta('365 days'))
 
 def test_splitbytime():
 
     testfile = 'test/ocean_scalar.nc'
     ds = xr.open_dataset(testfile,decode_times=False)
     ds['time'] = nc.num2date(ds.time, 'days since 1678-01-01 00:00:00', 'noleap')
-    
-    for var in splitbytime(ds['ke_tot'],'MS'):
+
+    for var in splitbytime(ds['ke_tot'],'12MS'):
         print(var.shape[0])
         print(var)
 

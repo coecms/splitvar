@@ -8,6 +8,7 @@ import argparse
 import xarray
 import pandas as pd
 import itertools as it
+import netCDF4 as nc
 
 def nested_groupby(dataarray, groupby):
     """From https://github.com/pydata/xarray/issues/324#issuecomment-265462343"""
@@ -16,28 +17,41 @@ def nested_groupby(dataarray, groupby):
     else:
         return dataarray.groupby(groupby[0]).apply(nested_groupby_apply, groupby = groupby[1:], apply_fn = apply_fn)
 
+def to_timedelta(freq):
+    """Hacky method to retrieve the delta associated with a frequency
+    Can't use inbuilt pandas to_timedelta. Really only works for delta < 1 day
+    We assume a start date of 1 Jan 1970
+    """
+    tmprange = pd.date_range(start="01/01/1970",periods=2,freq=freq)
+    
+    return tmprange[1]-tmprange[0]
+
 def splitbytime(var, freq, timedim='time'):
     """Given an xarray variable, split into periods of time defined by freq
     """
 
-    try:
-        if pd.infer_freq(var.indexes[timedim]) < freq:
-            raise ValueError("Frequency ({}) is higher than data ({}): not supported".format(freq,pd.infer_freq(var.indexes[timedim]) ))
-    except:
-        pass
+    # Check freq is greater than or equal to the frequency of the variable
+    # (so delta is <)
+    freq_delta = to_timedelta(freq) 
+    varvals = var.indexes[timedim].values
+    if (freq_delta < min(varvals[1:-1]-varvals[0:-2])):
+        raise ValueError("Split frequency is higher than data frequency: not supported")
 
-    # Create a temporary pandas data frame with the extracted time dimension
-    pdtime = pd.DataFrame(index=var.indexes[timedim])
-
-    print(pdtime.index)
-    print(pd.infer_freq(pdtime.index))
+    if (type(var.indexes[timedim][0]) == nc.netcdftime._netcdftime.DatetimeNoLeap):
+        # This variables is using a non-standard noleap calendar
+        # Create a temporary pandas data frame with the extracted time dimension
+        # pdtime = pd.DataFrame(index=[d._to_real_datetime() for d in var.indexes[timedim].values])
+        pdtime = pd.DataFrame(index=pd.date_range(start=varvals[0]._to_real_datetime(),end=varvals[-1]._to_real_datetime(),freq='D'))
+        # Change the time dimension to datetime so it can be sliced correctly
+        var[timedim] = [d._to_real_datetime() for d in var.indexes[timedim].values]
+    else:
+        pdtime = pd.DataFrame(index=var.indexes[timedim])
 
     # Use pandas time grouping to cycle through at freq, grabbing out
-    # the start and end points to select out data we want
+    # the start and end points to select out data
     for k, v in pdtime.groupby(pd.TimeGrouper(freq=freq)):
-        print(k)
-        s, e = [pdtime.index.get_loc(date) for date in v.index.values[[0,-1]]]
-        yield var[s:e+1]
+        s, e = v.index.values[[0,-1]]
+        yield var.sel(time=slice(pd.Timestamp(s),pd.Timestamp(e)))
 
 def splitbyvar(ds, freq):
     pass
