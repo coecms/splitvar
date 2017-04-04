@@ -36,6 +36,8 @@ import numpy as np
 import six
 import itertools as it
 
+from pandas.tseries.frequencies import to_offset
+
 # Find the python libraries we're testing
 sys.path.append('..')
 sys.path.append('.')
@@ -65,6 +67,11 @@ def test_totimedelta():
     assert(to_timedelta('1AS') == pd.Timedelta('365 days'))
     assert(to_timedelta('1A') == pd.Timedelta('365 days'))
 
+    # Other frequencies like 1M and 1A don't convery to offsets
+    # cleanly, which is why I wrote a local version of to_timedelta
+    for freq in ['1D']:
+        assert(pd.to_timedelta(to_offset(freq)) == to_timedelta(freq))
+
 def test_splitbytime():
 
     testfile = 'test/ocean_scalar.nc'
@@ -78,7 +85,7 @@ def test_splitbytime():
     
     np.random.seed(123)
 
-    times = pd.date_range('2000-02-23', '2003-09-13', name='time')
+    times = pd.date_range('2000-02-23', '2003-09-13 18:00:00', name='time', freq='1D')
     annual_cycle = np.sin(2 * np.pi * (times.dayofyear / 365.25 - 0.28))
     
     base = 10 + 15 * annual_cycle.reshape(-1, 1)
@@ -124,4 +131,31 @@ def test_splitbytime():
     with pytest.raises(ValueError):
         for var in splitbytime(ds['tmin'],'H'):
             pass
+
+
+    # Test sub-daily frequency
+
+    times = pd.date_range('2000-02-23', '2003-09-13 18:00:00', name='time', freq='6H')
+    annual_cycle = np.sin(2 * np.pi * (times.dayofyear / 365.25 - 0.28))
+    
+    base = 10 + 15 * annual_cycle.reshape(-1, 1)
+    tmin_values = base + 3 * np.random.randn(annual_cycle.size, 3)
+    tmax_values = base + 10 + 3 * np.random.randn(annual_cycle.size, 3)
+    
+    ds = xr.Dataset({'tmin': (('time', 'location'), tmin_values),
+                    'tmax': (('time', 'location'), tmax_values)},
+                    {'time': times, 'location': ['IA', 'IN', 'IL']})
+
+    # Annual
+    groupsizes = np.array([344, 365, 365, 225]) * 4
+    assert(sum(groupsizes) == ds.tmin.shape[0])
+    for var, size in it.izip(splitbytime(ds['tmin'],'12MS'),groupsizes):
+        assert(var.shape[0] == size)
+
+    # Monthly
+    groupsizes = np.array([7, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 13]) * 4
+    assert(sum(groupsizes) == ds.tmin.shape[0])
+    for var, size in it.izip(splitbytime(ds['tmin'],'1MS'),groupsizes):
+        assert(var.shape[0] == size)
+        # print(var.shape[0],size)
 

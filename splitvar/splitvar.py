@@ -17,14 +17,18 @@ def nested_groupby(dataarray, groupby):
     else:
         return dataarray.groupby(groupby[0]).apply(nested_groupby_apply, groupby = groupby[1:], apply_fn = apply_fn)
 
-def to_timedelta(freq):
+def to_timedelta(freq,start="01/01/1970"):
     """Hacky method to retrieve the delta associated with a frequency
     Can't use inbuilt pandas to_timedelta. Really only works for delta < 1 day
-    We assume a start date of 1 Jan 1970
+    We assume a start date of 1 Jan 1970, which is a non-leap year
     """
-    tmprange = pd.date_range(start="01/01/1970",periods=2,freq=freq)
+    tmprange = pd.date_range(start=start,periods=2,freq=freq)
     
     return tmprange[1]-tmprange[0]
+
+def to_freq(delta):
+    """Hacky method """
+    pass
 
 def splitbytime(var, freq, timedim='time'):
     """Given an xarray variable, split into periods of time defined by freq
@@ -34,14 +38,16 @@ def splitbytime(var, freq, timedim='time'):
     # (so delta is <)
     freq_delta = to_timedelta(freq) 
     varvals = var.indexes[timedim].values
-    if (freq_delta < min(varvals[1:-1]-varvals[0:-2])):
-        raise ValueError("Split frequency is higher than data frequency: not supported")
+    vardelta = pd.Timedelta(min(varvals[1:-1]-varvals[0:-2]))
+    if (freq_delta < vardelta):
+        # raise ValueError("Split frequency ({}) is higher than data frequency ({}): not supported".format(freq,strfdelta(vardelta,"{D}d {H}h {M}m {S}s")))
+        raise ValueError("Split frequency ({}) is higher than data frequency ({}): not supported".format(freq,vardelta))
 
     if (type(var.indexes[timedim][0]) == nc.netcdftime._netcdftime.DatetimeNoLeap):
-        # This variables is using a non-standard noleap calendar
-        # Create a temporary pandas data frame with the extracted time dimension
-        # pdtime = pd.DataFrame(index=[d._to_real_datetime() for d in var.indexes[timedim].values])
-        pdtime = pd.DataFrame(index=pd.date_range(start=varvals[0]._to_real_datetime(),end=varvals[-1]._to_real_datetime(),freq='D'))
+        # Variable is using a non-standard noleap calendar
+        # Create a temporary pandas data frame with the start and end extracted time dimension
+        # and the same frequency, but this has leap years (not an issue for what we will use this)
+        pdtime = pd.DataFrame(index=pd.date_range(start=varvals[0]._to_real_datetime(),end=varvals[-1]._to_real_datetime(),freq=vardelta))
         # Change the time dimension to datetime so it can be sliced correctly
         var[timedim] = [d._to_real_datetime() for d in var.indexes[timedim].values]
     else:
