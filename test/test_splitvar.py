@@ -33,7 +33,6 @@ import netCDF4 as nc
 import xarray as xr
 import pandas as pd
 import numpy as np
-import six
 
 from pandas.tseries.frequencies import to_offset
 
@@ -98,32 +97,32 @@ def test_splitbytime():
     # Annual
     groupsizes = [344, 365, 365, 225]
     assert(sum(groupsizes) == ds.tmin.shape[0])
-    for var, size in six.zip(splitbytime(ds['tmin'],'12MS'),groupsizes):
+    for var, size in zip(splitbytime(ds['tmin'],'12MS'),groupsizes):
         assert(var.shape[0] == size)
 
     # Bi-annual
     groupsizes = [709, 590]
     assert(sum(groupsizes) == ds.tmin.shape[0])
-    for var, size in six.zip(splitbytime(ds['tmin'],'24MS'),groupsizes):
+    for var, size in zip(splitbytime(ds['tmin'],'24MS'),groupsizes):
         assert(var.shape[0] == size)
 
     # Monthly
     groupsizes = [7, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 13]
     assert(sum(groupsizes) == ds.tmin.shape[0])
-    for var, size in six.zip(splitbytime(ds['tmin'],'1MS'),groupsizes):
+    for var, size in zip(splitbytime(ds['tmin'],'1MS'),groupsizes):
         assert(var.shape[0] == size)
 
     # 6 monthly
     groupsizes = [160, 184, 181, 184, 181, 184, 181, 44]
     assert(sum(groupsizes) == ds.tmin.shape[0])
-    for var, size in six.zip(splitbytime(ds['tmin'],'6MS'),groupsizes):
+    for var, size in zip(splitbytime(ds['tmin'],'6MS'),groupsizes):
         assert(var.shape[0] == size)
 
     # 5 daily
     groupsizes = 5*np.ones(ds.tmin.shape[0]/5,np.int)
     groupsizes = np.append(groupsizes,int(ds.tmin.shape[0] - 5*len(groupsizes)))
     assert(sum(groupsizes) == ds.tmin.shape[0])
-    for var, size in six.zip(splitbytime(ds['tmin'],'5D'),groupsizes):
+    for var, size in zip(splitbytime(ds['tmin'],'5D'),groupsizes):
         assert(var.shape[0] == size)
 
     # Check exception is raised if frequency is higher than that in the data
@@ -148,13 +147,13 @@ def test_splitbytime():
     # Annual
     groupsizes = np.array([344, 365, 365, 225]) * 4
     assert(sum(groupsizes) == ds.tmin.shape[0])
-    for var, size in six.zip(splitbytime(ds['tmin'],'12MS'),groupsizes):
+    for var, size in zip(splitbytime(ds['tmin'],'12MS'),groupsizes):
         assert(var.shape[0] == size)
 
     # Monthly
     groupsizes = np.array([7, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 28, 31, 30, 31, 30, 31, 31, 13]) * 4
     assert(sum(groupsizes) == ds.tmin.shape[0])
-    for var, size in six.zip(splitbytime(ds['tmin'],'1MS'),groupsizes):
+    for var, size in zip(splitbytime(ds['tmin'],'1MS'),groupsizes):
         assert(var.shape[0] == size)
         # print(var.shape[0],size)
 
