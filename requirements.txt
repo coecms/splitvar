@@ -1,0 +1,6 @@
+xarray
+netCDF4
+pandas
+numpy
+six
+pytest
