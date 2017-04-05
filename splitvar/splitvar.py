@@ -7,7 +7,6 @@ import sys
 import argparse
 import xarray
 import pandas as pd
-import itertools as it
 import netCDF4 as nc
 
 def nested_groupby(dataarray, groupby):
