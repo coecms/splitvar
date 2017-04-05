@@ -1,3 +1,4 @@
+hdf5
 xarray
 netCDF4
 pandas
