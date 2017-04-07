@@ -25,10 +25,6 @@ def to_timedelta(freq,start="01/01/1970"):
     
     return tmprange[1]-tmprange[0]
 
-def to_freq(delta):
-    """Hacky method """
-    pass
-
 def splitbytime(var, freq, timedim='time'):
     """Given an xarray variable, split into periods of time defined by freq
     """
@@ -58,8 +54,31 @@ def splitbytime(var, freq, timedim='time'):
         s, e = v.index.values[[0,-1]]
         yield var.sel(time=slice(pd.Timestamp(s),pd.Timestamp(e)))
 
-def splitbyvar(ds, freq):
-    pass
+def splitbyvar(ds,vars=None,skipvars=['time']):
+
+    if vars is None:
+        selectvars = set(ds.data_vars)
+    else:
+        selectvars = set(vars)
+
+    if skipvars is not None:
+        for varname in skipvars:
+            selectvars.discard(varname)
+            selectvars.discard(varname.upper)
+            selectvars.discard(varname.lower)
+
+    for var in ds.data_vars:
+        if var in vars and var not in skipvars:
+            yield ds[var]
+
+def genfilepath(var):
+    """Generate a file "path" from the name of the variable and it's frequency
+    """
+
+def writevar(var,filename):
+    """Save variable to netcdf file
+    """
+    var.to_netcdf(path=filename,format="NETCDF4_CLASSIC")
 
 def open_files(file_paths, freq):
 

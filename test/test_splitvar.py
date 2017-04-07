@@ -40,7 +40,7 @@ from pandas.tseries.frequencies import to_offset
 sys.path.append('..')
 sys.path.append('.')
 
-from splitvar import splitbytime, to_timedelta
+from splitvar import splitbytime, to_timedelta, splitbyvar, writevar
 
 verbose = True
 
@@ -76,11 +76,10 @@ def test_splitbytime():
     ds = xr.open_dataset(testfile,decode_times=False)
     ds['time'] = nc.num2date(ds.time, 'days since 1678-01-01 00:00:00', 'noleap')
 
-    for var in splitbytime(ds['ke_tot'],'12MS'):
-        print(var.shape[0])
-        print(var)
+    # for var in splitbytime(ds['ke_tot'],'12MS'):
+    #     print(var.shape[0])
+    #     print(var)
 
-    
     np.random.seed(123)
 
     times = pd.date_range('2000-02-23', '2003-09-13 18:00:00', name='time', freq='1D')
@@ -156,4 +155,21 @@ def test_splitbytime():
     for var, size in zip(splitbytime(ds['tmin'],'1MS'),groupsizes):
         assert(var.shape[0] == size)
         # print(var.shape[0],size)
+
+def test_splitbyvariable():
+
+    testfile = 'test/ocean_scalar.nc'
+    ds = xr.open_dataset(testfile,decode_times=False)
+    ds['time'] = nc.num2date(ds.time, 'days since 1678-01-01 00:00:00', 'noleap')
+
+    ds2 = ds['temp_global_ave']
+
+    i = 0
+    for var in splitbyvar(ds,['salt_global_ave','temp_global_ave']):
+        print(var.name)
+        for varbytime in splitbytime(var,'24MS'):
+            i += 1
+            fname = "{}_{}.nc".format(var.name,i)
+            print(varbytime.shape,fname)
+            writevar(var,fname)
 
