@@ -8,6 +8,7 @@ import argparse
 import xarray
 import pandas as pd
 import netCDF4 as nc
+import cftime
 
 def nested_groupby(dataarray, groupby):
     """From https://github.com/pydata/xarray/issues/324#issuecomment-265462343"""
@@ -38,7 +39,7 @@ def splitbytime(var, freq, timedim='time'):
         # raise ValueError("Split frequency ({}) is higher than data frequency ({}): not supported".format(freq,strfdelta(vardelta,"{D}d {H}h {M}m {S}s")))
         raise ValueError("Split frequency ({}) is higher than data frequency ({}): not supported".format(freq,vardelta))
 
-    if (type(var.indexes[timedim][0]) == nc.netcdftime._netcdftime.DatetimeNoLeap):
+    if (type(var.indexes[timedim][0]) == cftime.DatetimeNoLeap):
         # Variable is using a non-standard noleap calendar
         # Create a temporary pandas data frame with the start and end extracted time dimension
         # and the same frequency, but this has leap years (not an issue for what we will use this)
@@ -50,7 +51,7 @@ def splitbytime(var, freq, timedim='time'):
 
     # Use pandas time grouping to cycle through at freq, grabbing out
     # the start and end points to select out data
-    for k, v in pdtime.groupby(pd.TimeGrouper(freq=freq)):
+    for k, v in pdtime.groupby(pd.Grouper(freq=freq)):
         s, e = v.index.values[[0,-1]]
         yield var.sel(time=slice(pd.Timestamp(s),pd.Timestamp(e)))
 
