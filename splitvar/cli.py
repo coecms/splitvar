@@ -35,6 +35,14 @@ def parse_args(args):
     parser.add_argument('-v','--variables', 
                         help='Only extract specified variables', 
                         action='append')
+    parser.add_argument('-x','--x-variables', 
+                        dest='skipvars',
+                        help='Exclude specified variables', 
+                        action='append')
+    parser.add_argument('-d','--delattr', 
+                        help='Delete specified global attributes', 
+                        default=['filename'], 
+                        action='append')
     parser.add_argument('-a','--add', 
                         help='Read in additional variables from these files', 
                         action='append')
@@ -48,9 +56,14 @@ def parse_args(args):
     parser.add_argument('--simname', 
                         help='Simulation name to include in the filename', 
                         action='store')
+    parser.add_argument('--model-type', 
+                        dest='modeltype',
+                        help='Model type to include in the filename', 
+                        default='',
+                        action='store')
     parser.add_argument('--timeformat', 
                         help='strftime format string for date fields in filename', 
-                        default='%Y-%m', 
+                        default='%Y%m', 
                         action='store')
     parser.add_argument('-o','--outputdir', 
                         help='Output directory in which to store the data', 
@@ -113,8 +126,9 @@ def main(args):
 
     for var in splitbyvar(ds, args.variables, args.skipvars):
         i = 0
+        print('Splitting {var} by time'.format(var=var))
         name = sanitise(var)
-        outpath = os.path.join(args.outputdir, ds.simname, name)
+        outpath = os.path.normpath(os.path.join(args.outputdir, ds.simname, args.modeltype, name))
         os.makedirs(outpath)
         varlist = [var,] + getdependentvars(ds, var)
         dsbyvar = ds[varlist]
@@ -158,8 +172,17 @@ def main(args):
                 except:
                     pass
 
+            for attr in args.delattr:
+                try:
+                    del(dsbytime.attrs[attr])
+                except KeyError:
+                    pass
+
             fpath = os.path.join(outpath, fname)
             writevar(dsbytime, fpath)
+        if i == 0:
+            # No data written, delete empty output directory
+            os.rmdir(outpath)
 
 if __name__ == '__main__':
 

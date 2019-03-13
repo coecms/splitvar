@@ -60,8 +60,11 @@ def groupbytime(var, freq, timedim='time'):
     """
     Given an xarray variable, split into periods of time defined by freq
     """
-    for k, v in var.groupby(freq):
-        yield v
+    try:
+        for k, v in var.groupby(freq):
+            yield v
+    except KeyError:
+        return None
 
 def splitbyvar(ds,vars=None,skipvars=['time']):
     """
