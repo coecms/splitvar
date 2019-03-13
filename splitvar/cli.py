@@ -45,6 +45,7 @@ def parse_args(args):
                         action='append')
     parser.add_argument('-a','--add', 
                         help='Read in additional variables from these files', 
+                        default=[], 
                         action='append')
     parser.add_argument('-s','--skipvars', 
                         help='Do not extract these variables', 
