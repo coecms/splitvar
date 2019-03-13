@@ -9,6 +9,7 @@ import xarray
 import pandas as pd
 import netCDF4 as nc
 import cftime
+from copy import deepcopy
 
 def nested_groupby(dataarray, groupby):
     """From https://github.com/pydata/xarray/issues/324#issuecomment-265462343"""
@@ -26,10 +27,11 @@ def to_timedelta(freq,start="01/01/1970"):
     
     return tmprange[1]-tmprange[0]
 
-def splitbytime(var, freq, timedim='time'):
+def oldsplitbytime(var, freq, timedim='time'):
     """Given an xarray variable, split into periods of time defined by freq
     """
 
+    import pdb; pdb.set_trace()
     # Check freq is greater than or equal to the frequency of the variable
     # (so delta is <)
     freq_delta = to_timedelta(freq) 
@@ -55,45 +57,73 @@ def splitbytime(var, freq, timedim='time'):
         s, e = v.index.values[[0,-1]]
         yield var.sel(time=slice(pd.Timestamp(s),pd.Timestamp(e)))
 
-def splitbyvar(ds,vars=None,skipvars=['time']):
+def splitbytime(var, freq, timedim='time'):
+    """
+    Given an xarray variable, split into periods of time defined by freq
+    """
+    for k, v in var.groupby(freq):
+        yield v
 
+def splitbyvar(ds,vars=None,skipvars=['time']):
+    """
+    Given an xarray variable, split into separate variables
+    """
     if vars is None:
-        selectvars = set(ds.data_vars)
+        vars = set(ds.data_vars)
     else:
-        selectvars = set(vars)
+        vars = set(vars).intersection(set(ds.data_vars))
 
     if skipvars is not None:
         for varname in skipvars:
-            selectvars.discard(varname)
-            selectvars.discard(varname.upper)
-            selectvars.discard(varname.lower)
+            vars.discard(varname)
+            vars.discard(varname.upper)
+            vars.discard(varname.lower)
 
-    for var in ds.data_vars:
-        if var in vars and var not in skipvars:
-            yield ds[var]
+
+    for var in vars:
+        yield var
+
+def getdependentvars(ds, var, skip_attrs=['long_name', 'standard_name', 'name', 'description']):
+    """
+    Find other variables upon which var depends
+    """
+    depvars = set()
+    # Cycle through all the variables to be selected
+    # and check if they depend on any other variables
+    for attr in ds[var].attrs:
+        if attr in skip_attrs:
+            continue
+        for attvar in ds.data_vars:
+            if attvar == var: 
+                continue
+            # print(var,attvar,attr,ds[var].attrs[attr])
+            if attvar in ds[var].attrs[attr]:
+                # Variable is mentioned in an attribute
+                # so should also be copied 
+                depvars.add(attvar)
+
+    return list(depvars)
 
 def genfilepath(var):
-    """Generate a file "path" from the name of the variable and it's frequency
+    """
+    Generate a file "path" from the name of the variable 
+    and it's frequency
     """
 
 def writevar(var,filename):
-    """Save variable to netcdf file
     """
+    Save variable to netcdf file
+    """
+    print('Saving data to {fname}'.format(fname=filename))
     var.to_netcdf(path=filename,format="NETCDF4_CLASSIC")
 
 def open_files(file_paths, freq):
 
     # try and catch decode_times issues
-    ds = xarray.open_mfdataset(file_paths, engine='netcdf4', decode_times=False, mask_and_scale=True)
+    ds = xarray.open_mfdataset(file_paths, decode_cf=False, engine='netcdf4', mask_and_scale=True)
 
-if __name__ == "__main__":
+    for v in ds:
+        if 'chunksizes' in ds[v].encoding:
+            ds[v].chunk(ds[v].encoding['chunksizes'])
 
-    parser = argparse.ArgumentParser(description="Split multiple netCDF files by time and variable")
-
-    parser.add_argument("-v","--verbose", help="Verbose output", action='store_true')
-
-    parser.add_argument("inputs", help="netCDF files or directories", nargs='+')
-    args = parser.parse_args()
-
-    open_files(args, freq='year')
-    
+    return ds
