@@ -27,11 +27,10 @@ def to_timedelta(freq,start="01/01/1970"):
     
     return tmprange[1]-tmprange[0]
 
-def oldsplitbytime(var, freq, timedim='time'):
+def splitbytime(var, freq, timedim='time'):
     """Given an xarray variable, split into periods of time defined by freq
     """
 
-    import pdb; pdb.set_trace()
     # Check freq is greater than or equal to the frequency of the variable
     # (so delta is <)
     freq_delta = to_timedelta(freq) 
@@ -57,7 +56,7 @@ def oldsplitbytime(var, freq, timedim='time'):
         s, e = v.index.values[[0,-1]]
         yield var.sel(time=slice(pd.Timestamp(s),pd.Timestamp(e)))
 
-def splitbytime(var, freq, timedim='time'):
+def groupbytime(var, freq, timedim='time'):
     """
     Given an xarray variable, split into periods of time defined by freq
     """

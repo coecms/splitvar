@@ -166,10 +166,10 @@ def test_splitbyvariable():
 
     i = 0
     for var in splitbyvar(ds,['salt_global_ave','temp_global_ave']):
-        print(var.name)
-        for varbytime in splitbytime(var,'24MS'):
+        print(var)
+        for varbytime in splitbytime(ds[var],'24MS'):
             i += 1
-            fname = "{}_{}.nc".format(var.name,i)
+            fname = "{}_{}.nc".format(var,i)
             print(varbytime.shape,fname)
-            writevar(var,fname)
+            writevar(varbytime,fname)
 

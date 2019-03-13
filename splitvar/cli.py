@@ -118,7 +118,7 @@ def main(args):
         os.makedirs(outpath)
         varlist = [var,] + getdependentvars(ds, var)
         dsbyvar = ds[varlist]
-        for dsbytime in splitbytime(dsbyvar, args.frequency):
+        for dsbytime in groupbytime(dsbyvar, args.frequency):
             i += 1
             # TODO: Do something a bit cleverer to identify time variable
             timevar = dsbytime.time
