@@ -121,8 +121,11 @@ def writevar(var,filename):
 
 def open_files(file_paths, freq):
 
-    # try and catch decode_times issues
-    ds = xarray.open_mfdataset(file_paths, decode_cf=False, engine='netcdf4', mask_and_scale=True)
+    ds = xarray.open_mfdataset(file_paths, 
+                               decode_cf=False, 
+                               engine='netcdf4', 
+                               data_vars='minimal',
+                               mask_and_scale=True)
 
     for v in ds:
         if 'chunksizes' in ds[v].encoding:
