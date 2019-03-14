@@ -130,7 +130,10 @@ def main(args):
         print('Splitting {var} by time'.format(var=var))
         name = sanitise(var)
         outpath = os.path.normpath(os.path.join(args.outputdir, ds.simname, args.modeltype, name))
-        os.makedirs(outpath)
+        try:
+            os.makedirs(outpath)
+        except FileExistsError:
+            pass
         varlist = [var,] + getdependentvars(ds, var)
         dsbyvar = ds[varlist]
         for dsbytime in groupbytime(dsbyvar, args.frequency):
