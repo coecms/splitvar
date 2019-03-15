@@ -95,7 +95,7 @@ def getdependentvars(ds, var, skip_attrs=['long_name', 'standard_name', 'name', 
     for attr in ds[var].attrs:
         if attr in skip_attrs:
             continue
-        for attvar in ds.data_vars:
+        for attvar in list(ds.data_vars) + list(ds.coords):
             if attvar == var: 
                 continue
             # print(var,attvar,attr,ds[var].attrs[attr])
@@ -104,7 +104,14 @@ def getdependentvars(ds, var, skip_attrs=['long_name', 'standard_name', 'name', 
                 # so should also be copied 
                 depvars.add(attvar)
 
-    return list(depvars)
+    depdepvars = set()
+    for var in depvars:
+        # One level of recursion to make sure we get all the 
+        # dependencies of the variables/coordindates we just
+        # found 
+        depdepvars = depdepvars.union(getdependentvars(ds, var, skip_attrs))
+
+    return list(depvars.union(depdepvars))
 
 def genfilepath(var):
     """
