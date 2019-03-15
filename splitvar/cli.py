@@ -153,7 +153,7 @@ def main(args):
 
             dsbytime.attrs['geospatial_lat_min'] =  99999.
             dsbytime.attrs['geospatial_lat_max'] = -99999.
-            for var in ['yt_ocean', 'geolat_t', 'geolat_c']:
+            for var in findmatchingvars(dsbytime, matchstrings=['degrees_N', 'degrees_north']):
                 if var in dsbytime:
                     dsbytime.attrs['geospatial_lat_min'] = min(
                         dsbytime[var].min().values, dsbytime.attrs['geospatial_lat_min'])
@@ -162,7 +162,7 @@ def main(args):
 
             dsbytime.attrs['geospatial_lon_min'] = 99999.
             dsbytime.attrs['geospatial_lon_max'] = -99999.
-            for var in ['xt_ocean', 'geolon_t', 'geolon_c']:
+            for var in findmatchingvars(dsbytime, matchstrings=['degrees_E','degrees_east']):
                 if var in dsbytime:
                     dsbytime.attrs['geospatial_lon_min'] = min(
                         dsbytime[var].min().values, dsbytime.attrs['geospatial_lon_min'])

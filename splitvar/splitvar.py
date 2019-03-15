@@ -132,3 +132,20 @@ def open_files(file_paths, freq):
             ds[v].chunk(ds[v].encoding['chunksizes'])
 
     return ds
+
+def findmatchingvars(ds, attname='units', matchstrings=[], ignorecase=True):
+
+    matchvars = []
+
+    if ignorecase:
+        transcase = lambda x: x
+    else:
+        transcase = lambda x: x.lower()
+
+    for var in ds.coords:
+        if 'units' in ds[var].attrs:
+            for matchstring in matchstrings:
+                if transcase(matchstring) in transcase(ds[var].attrs[attname]):
+                    matchvars.append(var)
+
+    return matchvars
