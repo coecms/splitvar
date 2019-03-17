@@ -28,7 +28,7 @@ test:
     requires:
         - pytest
     commands:
-        - py.test test
+        - pytest test
 
 about:
     home: https://github.com/coecms/splitvar
