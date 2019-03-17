@@ -18,7 +18,6 @@ requirements:
         - pbr
     run:
         - python
-        - six
 
 test:
     source_files:
