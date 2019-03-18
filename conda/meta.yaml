@@ -21,6 +21,8 @@ requirements:
         - numpy
         - netcdf4
         - libnetcdf
+        - pandas
+        - xarray
 
 test:
     source_files:
