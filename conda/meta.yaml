@@ -18,6 +18,9 @@ requirements:
         - pbr
     run:
         - python
+        - numpy
+        - netcdf4
+        - libnetcdf
 
 test:
     source_files:
