@@ -29,9 +29,17 @@ def parse_args(args):
 
     # parser.add_argument('-v','--verbose', help='Verbose output', action='store_true')
     parser.add_argument('-f','--frequency', 
-                        help='Time frequency for output', 
+                        help='Time period to group for output', 
                         default='time.year', 
                         action='store')
+    parser.add_argument('--aggregate', 
+                        help='Apply mean in time, using pandas frequency notation e.g Y, 6M, 2Y', 
+                        default=None,
+                        action='store')
+    # parser.add_argument('--function', 
+    #                     help='Function to apply to aggregation', 
+    #                     default='mean',
+    #                     action='store')
     parser.add_argument('-v','--variables', 
                         help='Only extract specified variables', 
                         action='append')
@@ -136,10 +144,14 @@ def main(args):
             pass
         varlist = [var,] + getdependentvars(ds, var)
         dsbyvar = ds[varlist]
-        for dsbytime in groupbytime(dsbyvar, args.frequency):
+        if args.aggregate:
+            dsbyvar = dsbyvar.resample({'time': args.aggregate}).mean()
+        for dsbytime in groupbytime(dsbyvar, freq='time.year'):
             i += 1
+
             # TODO: Do something a bit cleverer to identify time variable
             timevar = dsbytime.time
+
             startdate=timevar.values[0].strftime(args.timeformat)
             enddate=timevar.values[-1].strftime(args.timeformat)
             fname = '{name}_{simulation}_{fromdate}_{todate}.nc'.format(

@@ -2,9 +2,11 @@
 
 from __future__ import print_function
 
-import os
-import sys
 import argparse
+import os
+import re
+
+import sys
 import xarray
 import pandas as pd
 import netCDF4 as nc
@@ -66,6 +68,18 @@ def groupbytime(var, freq, timedim='time'):
     except KeyError:
         return None
 
+def resamplebytime(var, freq, timedim='time'):
+    """
+    Given an xarray variable, split into periods of time defined by freq
+    """
+    try:
+        for k, v in var.resample({timedim: freq}):
+            yield v
+    except KeyError:
+        print(var, timedim, freq)
+        raise
+        # return None
+
 def splitbyvar(ds,vars=None,skipvars=['time']):
     """
     Given an xarray variable, split into separate variables
@@ -98,11 +112,16 @@ def getdependentvars(ds, var, skip_attrs=['long_name', 'standard_name', 'name', 
         for attvar in list(ds.data_vars) + list(ds.coords):
             if attvar == var: 
                 continue
-            # print(var,attvar,attr,ds[var].attrs[attr])
-            if attvar in ds[var].attrs[attr]:
-                # Variable is mentioned in an attribute
-                # so should also be copied 
-                depvars.add(attvar)
+            # Need to use a proper regex to search on word boundaries
+            # to stop spurious matching with variables like "u" and "v"
+            try:
+                if re.search(r'\b'+attvar+r'\b', ds[var].attrs[attr]):
+                    # Variable is mentioned in an attribute
+                    # so should also be copied 
+                    depvars.add(attvar)
+            except TypeError:
+                # Probably trying to match a number, so ignore
+                pass
 
     depdepvars = set()
     for var in depvars:
