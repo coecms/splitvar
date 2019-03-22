@@ -145,7 +145,7 @@ def main(args):
         varlist = [var,] + getdependentvars(ds, var)
         dsbyvar = ds[varlist]
         if args.aggregate:
-            dsbyvar = dsbyvar.resample({'time': args.aggregate}).mean()
+            dsbyvar = dsbyvar.resample({'time': args.aggregate}, keep_attrs=True).mean(keep_attrs=True)
         for dsbytime in groupbytime(dsbyvar, freq='time.year'):
             i += 1
 
