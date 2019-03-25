@@ -195,7 +195,7 @@ def main(args):
                     pass
 
             fpath = os.path.join(outpath, fname)
-            writevar(dsbytime, fpath)
+            writevar(dsbytime, fpath, unlimited=timevar.name)
         if i == 0:
             # No data written, delete empty output directory
             os.rmdir(outpath)
