@@ -78,6 +78,9 @@ def parse_args(args):
                         help='Output directory in which to store the data', 
                         default='.', 
                         action='store')
+    parser.add_argument('-cp','--copytimeunits', 
+                        help='Copy time units from time variable to bounds', 
+                        action='store_true')
     parser.add_argument('inputs', help='netCDF files', nargs='+')
 
     return parser.parse_args(args)
@@ -129,7 +132,22 @@ def main(args):
     for fname in args.add:
         print('Adding {}'.format(fname))
         add_ds = xarray.open_dataset(fname, decode_cf=False)
-        ds.update(add_ds)
+        # Updating the additional dataset means vars from
+        # ds take precedence. Definitely don't want time var
+        # overwritten for example
+        ds.combine_first(add_ds)
+
+    timevar = findmatchingvars(ds, matchstrings=[' since '])[0]
+    print('Found time variable: {}'.format(timevar))
+
+    # In some cases the units in the time bounds is just 'days'
+    # which leads to them being decoded as timedelta. Setting
+    # this command line option will copy the units from time
+    # into the bounds variable
+    if args.copytimeunits:
+        if 'bounds' in ds[timevar].attrs:
+            boundsvar = ds[timevar].attrs['bounds']
+            ds[boundsvar].attrs['units'] = ds[timevar].attrs['units']
 
     ds = xarray.decode_cf(ds)
 
@@ -145,15 +163,21 @@ def main(args):
         varlist = [var,] + getdependentvars(ds, var)
         dsbyvar = ds[varlist]
         if args.aggregate:
-            dsbyvar = dsbyvar.resample({'time': args.aggregate}, keep_attrs=True).mean(keep_attrs=True)
+            # dsbyvar = dsbyvar.resample(var, {'time': args.aggregate}, keep_attrs=True)
+            # for v in list(dsbyvar.data_vars) + list(dsbyvar.coords):
+            #     dsbyvar[v].attrs.update(ds[v].attrs)
+            dsbyvar = resamplebytime(dsbyvar, var, args.aggregate, timedim='time')
         for dsbytime in groupbytime(dsbyvar, freq='time.year'):
             i += 1
 
-            # TODO: Do something a bit cleverer to identify time variable
-            timevar = dsbytime.time
+            startdate=dsbytime[timevar].values[0].strftime(args.timeformat)
+            enddate=dsbytime[timevar].values[-1].strftime(args.timeformat)
 
-            startdate=timevar.values[0].strftime(args.timeformat)
-            enddate=timevar.values[-1].strftime(args.timeformat)
+            if 'bounds' in dsbytime[timevar].attrs:
+                boundsvar = ds[timevar].attrs['bounds']
+                startdate=dsbytime[boundsvar].values[0][0].strftime(args.timeformat)
+                enddate=dsbytime[boundsvar].values[-1][1].strftime(args.timeformat)
+
             fname = '{name}_{simulation}_{fromdate}_{todate}.nc'.format(
                         name=name,
                         simulation=ds.attrs['simname'],
@@ -195,7 +219,7 @@ def main(args):
                     pass
 
             fpath = os.path.join(outpath, fname)
-            writevar(dsbytime, fpath, unlimited=timevar.name)
+            writevar(dsbytime, fpath, unlimited=timevar)
         if i == 0:
             # No data written, delete empty output directory
             os.rmdir(outpath)
