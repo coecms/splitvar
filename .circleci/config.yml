@@ -19,11 +19,11 @@ jobs:
                 ~/conda/bin/conda install --yes conda-build conda-verify
 
             - run: |
-                conda build conda --python=${PYTHON_VER}
+                ~/conda/bin/conda build conda --python=${PYTHON_VER}
 
             - run: |
                 mkdir /artefacts
-                cp $(conda build conda --python=${PYTHON_VER} --output) /artefacts
+                cp $(~/conda/bin/conda build conda --python=${PYTHON_VER} --output) /artefacts
 
             - persist_to_workspace:
                 root: /artefacts
