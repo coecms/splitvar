@@ -148,8 +148,10 @@ def resamplebytime(ds, var, freq, timedim='time', function=np.mean, copyattrs=Tr
 
     combined = xarray.merge(all)
 
-    for v in list(combined.data_vars) + list(combined.coords):
-        combined[v].attrs.update(ds[v].attrs)
+    if copyattrs:
+        for v in list(combined.data_vars) + list(combined.coords):
+            combined[v].attrs.update(ds[v].attrs)
+            combined[v].encoding.update(ds[v].encoding)
 
     return combined
 
