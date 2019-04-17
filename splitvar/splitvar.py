@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from __future__ import print_function
 
@@ -6,12 +6,11 @@ import argparse
 import os
 import re
 
+import cftime
+import numpy as np
+import pandas as pd
 import sys
 import xarray
-import pandas as pd
-import netCDF4 as nc
-import cftime
-from copy import deepcopy
 
 def nested_groupby(dataarray, groupby):
     """From https://github.com/pydata/xarray/issues/324#issuecomment-265462343"""
@@ -64,21 +63,97 @@ def groupbytime(var, freq, timedim='time'):
     """
     try:
         for k, v in var.groupby(freq):
+            # copyattr(var,v)
+            v.attrs.update(var.attrs)
             yield v
     except KeyError:
+        return
+
+def find_bounds(var, dim=None, **kwargs):
+    """
+    Return a bounds variable that encompasses the bounds of entire var. 
+    Used after resample to return bounds of a resampled variable.  
+    """
+
+    if len(var.shape) > 1:
+        try:
+            # Grab the first bounds and replace the end of the bounds with the
+            # second value in the last bounds
+            boundingvar = var[0]
+            boundingvar[1] = var[-1][1]
+        except:
+            boundingvar = var
+    else:
+        try:
+            # Grab the first bounds and replace the end of the bounds with the
+            # second value in the last bounds
+            boundingvar = var[-1]
+        except:
+            boundingvar = var
+
+    return boundingvar
+
+def sum_timedelta(var, dim=None, **kwargs):
+    """
+    When resampling a time delta need to sum all the individual periods
+    """
+    if dim is not None:
+        axis = var.get_axis_num(dim)
+        return var.sum(axis=axis)
+
+    return var.sum()
+
+def get_time_type(var):
+    """
+    Inspect a variable and return it's time type, which can be either
+    None: not a time variable
+    'datetime': is a date/time variable
+    'delta': is a timedelta variable
+    """
+    vartype = str(type(var.values.ravel()[0]))
+    if 'time' in vartype:
+        if 'delta' in vartype:
+            return 'delta'
+        else:
+            return 'datetime'
+    else:
         return None
 
-def resamplebytime(var, freq, timedim='time'):
+def resamplebytime(ds, var, freq, timedim='time', function=np.mean, copyattrs=True):
     """
-    Given an xarray variable, split into periods of time defined by freq
+    Given an xarray dataset, split into periods of time defined by freq
+    Major variable is var, others are dependent variables which will be
+    inspected for appropriate reduction methods
     """
-    try:
-        for k, v in var.resample({timedim: freq}):
-            yield v
-    except KeyError:
-        print(var, timedim, freq)
-        raise
-        # return None
+
+    # applied = (funcs[i](v) for i, v in enumerate(resampler._iter_grouped()))
+    all = []
+    for  v in ds:
+        # Inspect variables to determine most appropriate function
+        timetype = get_time_type(ds[v])
+        if timetype == 'delta':
+            func = sum_timedelta
+        elif timetype == 'datetime':
+            func = find_bounds 
+        else:
+            func = function
+
+        print(v,func)
+        # resampler = ds[v].resample({timedim: freq})
+        applied = []
+        for dsg in ds[v].resample({timedim: freq}).reduce(func,dim=timedim):
+            print(dsg)
+            applied.append(dsg)
+        all.append(xarray.concat(applied, dim=timedim))
+
+    combined = xarray.merge(all)
+
+    if copyattrs:
+        for v in list(combined.data_vars) + list(combined.coords):
+            combined[v].attrs.update(ds[v].attrs)
+            combined[v].encoding.update(ds[v].encoding)
+
+    return combined
 
 def splitbyvar(ds,vars=None,skipvars=['time']):
     """
@@ -94,7 +169,6 @@ def splitbyvar(ds,vars=None,skipvars=['time']):
             vars.discard(varname)
             vars.discard(varname.upper)
             vars.discard(varname.lower)
-
 
     for var in vars:
         yield var
@@ -143,7 +217,6 @@ def writevar(var, filename, unlimited=None):
     Save variable to netcdf file
     """
     print('Saving data to {fname}'.format(fname=filename))
-    print(var)
     if unlimited is not None:
         if type(unlimited) is str:
             unlimited = [unlimited]
@@ -162,11 +235,14 @@ def open_files(file_paths, freq):
 
     for v in ds:
         if 'chunksizes' in ds[v].encoding:
-            ds[v].chunk(ds[v].encoding['chunksizes'])
+            ds[v] = ds[v].chunk(ds[v].encoding['chunksizes'])
 
     return ds
 
-def findmatchingvars(ds, attname='units', matchstrings=[], ignorecase=True):
+def findmatchingvars(ds, att='units', matchstrings=[], ignorecase=True):
+    """
+    Find coords with matching attributes
+    """
 
     matchvars = []
 
@@ -176,9 +252,9 @@ def findmatchingvars(ds, attname='units', matchstrings=[], ignorecase=True):
         transcase = lambda x: x.lower()
 
     for var in ds.coords:
-        if 'units' in ds[var].attrs:
+        if att in ds[var].attrs:
             for matchstring in matchstrings:
-                if transcase(matchstring) in transcase(ds[var].attrs[attname]):
+                if transcase(matchstring) in transcase(ds[var].attrs[att]):
                     matchvars.append(var)
 
     return matchvars
