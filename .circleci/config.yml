@@ -1,7 +1,7 @@
 version: 2
 jobs:
     py36:
-        working_directory: /circleci
+        working_directory: ~/circleci
         docker:
             - image: circleci/python
               environment:
