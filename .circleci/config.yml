@@ -22,7 +22,7 @@ jobs:
                 ~/conda/bin/conda build conda --python=${PYTHON_VER}
 
             - run: |
-                mkdir /artefacts
+                mkdir ~/artefacts
                 cp $(~/conda/bin/conda build conda --python=${PYTHON_VER} --output) ~/artefacts
 
             - persist_to_workspace:
