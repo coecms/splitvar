@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 import argparse
+from collections import defaultdict
 import os
 import re
 
@@ -173,10 +174,31 @@ def splitbyvar(ds,vars=None,skipvars=['time']):
     for var in vars:
         yield var
 
+def getdependents(ds, skip_attrs=['long_name', 'standard_name', 'name', 'description']):
+    """
+    Find all dependencies in dataset. Return dict with varnames as keys and dependent 
+    variable names in value array
+    """
+    depends = {}
+    for var in ds.data_vars:
+        depends[var] = getdependentvars(ds, var, skip_attrs)
+    return depends
+
+def dependentlookup(depends):
+    """
+    Generate a mapping from dependent variables back to variables on which they depend
+    """
+    lookup = defaultdict(list)
+    for k, v in depends.items():
+        for var in v:
+            lookup[var].append(k)
+    return lookup
+        
 def getdependentvars(ds, var, skip_attrs=['long_name', 'standard_name', 'name', 'description']):
     """
     Find other variables upon which var depends
     """
+
     depvars = set()
     # Cycle through all the variables to be selected
     # and check if they depend on any other variables
@@ -239,11 +261,10 @@ def open_files(file_paths, freq):
 
     return ds
 
-def findmatchingvars(ds, att='units', matchstrings=[], ignorecase=True):
+def findmatchingvars(ds, att='units', matchstrings=[], ignorecase=True, coords_only=False):
     """
-    Find coords with matching attributes
+    Find variables with matching attributes
     """
-
     matchvars = []
 
     if ignorecase:
@@ -251,7 +272,11 @@ def findmatchingvars(ds, att='units', matchstrings=[], ignorecase=True):
     else:
         transcase = lambda x: x.lower()
 
-    for var in ds.coords:
+    vars = list(ds.coords)
+    if not coords_only:
+        vars = vars + list(ds.data_vars)
+
+    for var in vars:
         if att in ds[var].attrs:
             for matchstring in matchstrings:
                 if transcase(matchstring) in transcase(ds[var].attrs[att]):
