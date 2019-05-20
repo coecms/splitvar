@@ -45,6 +45,7 @@ def parse_args(args):
                         action='append')
     parser.add_argument('-x','--x-variables', 
                         dest='skipvars',
+                        default=[],
                         help='Exclude specified variables', 
                         action='append')
     parser.add_argument('-d','--delattr', 
@@ -74,6 +75,11 @@ def parse_args(args):
                         help='strftime format string for date fields in filename', 
                         default='%Y%m', 
                         action='store')
+    parser.add_argument('--timeshift', 
+                        help='Shift time axis by specified amount (in whatever units are used in the file). Default is to automatically shift current start date to time origin', 
+                        const='auto', 
+                        nargs='?',
+                        action='store')
     parser.add_argument('-o','--outputdir', 
                         help='Output directory in which to store the data', 
                         default='.', 
@@ -99,19 +105,38 @@ def main_argv():
     '''
     main_parse_args(sys.argv[1:])
 
-def sanitise(string, replacements={'_' : '-'}):
-    """
-    Substitute characters that are used as separators in the pathname and other
-    special characters if required
-    """
-    for c in replacements:
-        string = string.replace(c, replacements[c])
-
-    return string
-
 def main(args):
 
     ds = open_files(args.inputs, freq=args.frequency)
+
+    # Find the time coordinate. Will return the first one. Code doesn't
+    # support multiple time axes
+    timevar = findmatchingvars(ds, matchstrings=[' since '], coords_only=True)[0]
+    print('Found time coordinate: {}'.format(timevar))
+
+    for fname in args.add:
+        print('Adding {}'.format(fname))
+        add_ds = xarray.open_dataset(fname, decode_cf=False)
+        if timevar in add_ds.coords:
+            delvars = [timevar]
+            for var in add_ds:
+                if timevar in add_ds[var].dims:
+                    delvars.append(var)
+            print('Deleting following variables with a time dimension from {}: {}'.format(fname, delvars))
+            add_ds = add_ds.drop(delvars)
+
+        # Updating the additional dataset means vars from
+        # ds take precedence. Definitely don't want time var
+        # overwritten for example
+        ds = ds.combine_first(add_ds)
+
+    # Create a dictionary we can use to find dependent vars
+    # for a given variable
+    depvars = getdependents(ds)
+
+    # Mapping from dependent variables back to variables which
+    # depend on them
+    is_dependent = dependentlookup(depvars)
 
     if args.simname:
         ds.attrs['simname'] = args.simname
@@ -129,29 +154,41 @@ def main(args):
             ds.attrs['title'] = ds.attrs['title']
         ds.attrs['title'] = sanitise(ds.attrs['title'])
 
-    for fname in args.add:
-        print('Adding {}'.format(fname))
-        add_ds = xarray.open_dataset(fname, decode_cf=False)
-        # Updating the additional dataset means vars from
-        # ds take precedence. Definitely don't want time var
-        # overwritten for example
-        ds.combine_first(add_ds)
-
-    timevar = findmatchingvars(ds, matchstrings=[' since '])[0]
-    print('Found time variable: {}'.format(timevar))
+    for attr in ['calendar', 'calendar_type']:
+        try:
+            ds[timevar].attrs[attr] = ds[timevar].attrs[attr].lower()
+        except:
+            pass
 
     # In some cases the units in the time bounds is just 'days'
     # which leads to them being decoded as timedelta. Setting
     # this command line option will copy the units from time
     # into the bounds variable
+    boundsvar = None
     if args.copytimeunits:
         if 'bounds' in ds[timevar].attrs:
             boundsvar = ds[timevar].attrs['bounds']
             ds[boundsvar].attrs['units'] = ds[timevar].attrs['units']
 
+    alltimevars = findmatchingvars(ds, matchstrings=[' since '])
+
+    if args.timeshift:
+        if args.timeshift == 'auto':
+            if boundsvar is not None:
+                shift = ds[boundsvar].values[0][0]
+            else:
+                shift = ds[timevar].values[0]
+        else:
+            shift = float(args.timeshift)
+        for var in alltimevars:
+            ds[var] = ds[var].copy(data = (ds[var].values[:] - shift))
+
     ds = xarray.decode_cf(ds)
 
-    for var in splitbyvar(ds, args.variables, args.skipvars):
+    # Add all dependent variables to the skipvar list
+    skipvars = set(args.skipvars + list(is_dependent.keys()))
+
+    for var in splitbyvar(ds, args.variables, skipvars):
         i = 0
         print('Splitting {var} by time'.format(var=var))
         name = sanitise(var)
@@ -160,24 +197,18 @@ def main(args):
             os.makedirs(outpath)
         except FileExistsError:
             pass
-        varlist = [var,] + getdependentvars(ds, var)
+        varlist = [var,] + depvars[var]
         dsbyvar = ds[varlist]
         if args.aggregate:
-            # dsbyvar = dsbyvar.resample(var, {'time': args.aggregate}, keep_attrs=True)
-            # for v in list(dsbyvar.data_vars) + list(dsbyvar.coords):
-            #     dsbyvar[v].attrs.update(ds[v].attrs)
             dsbyvar = resamplebytime(dsbyvar, var, args.aggregate, timedim='time')
         for dsbytime in groupbytime(dsbyvar, freq='time.year'):
             i += 1
-
-            startdate=dsbytime[timevar].values[0].strftime(args.timeformat)
-            enddate=dsbytime[timevar].values[-1].strftime(args.timeformat)
-
+            startdate = format_date(dsbytime[timevar].values[0], args.timeformat)
+            enddate = format_date(dsbytime[timevar].values[-1], args.timeformat)
             if 'bounds' in dsbytime[timevar].attrs:
                 boundsvar = ds[timevar].attrs['bounds']
-                startdate=dsbytime[boundsvar].values[0][0].strftime(args.timeformat)
-                enddate=dsbytime[boundsvar].values[-1][1].strftime(args.timeformat)
-
+                startdate = format_date(dsbytime[boundsvar].values[0][0], args.timeformat)
+                enddate = format_date(dsbytime[boundsvar].values[-1][1], args.timeformat)
             fname = '{name}_{simulation}_{fromdate}_{todate}.nc'.format(
                         name=name,
                         simulation=ds.attrs['simname'],
