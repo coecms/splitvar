@@ -187,15 +187,17 @@ def test_getdependents():
     testfile = 'test/ocean_scalar.nc'
     ds = xr.open_dataset(testfile)
 
-    depvars = getdependents(ds).items()
+    depvars = getdependents(ds)
     is_dependent = dependentlookup(depvars)
 
-    for k,v in is_dependent.items():
-        print(k,v)
+    # `for k,v in depvars.items():
+    # ``    print(k,v)
 
     for k,v in depvars.items():
         if k in is_dependent:
-            assert(len(k) == 0)
+            # Dependent vars should have no dependencies
+            assert(len(v) == 0)
         else:
-            assert(sorted(k) == ['average_DT', 'average_T1', 'average_T2', 'time', 'time_bounds'])
+            # Non dependent vars should all have the same dependencies
+            assert(sorted(v) == ['average_DT', 'average_T1', 'average_T2', 'time', 'time_bounds'])
 
