@@ -80,6 +80,9 @@ def parse_args(args):
                         const='auto', 
                         nargs='?',
                         action='store')
+    parser.add_argument('--calendar', 
+                        help='Specify calendar: will replace value of calendar attribute whereever it is found', 
+                        action='store')
     parser.add_argument('-o','--outputdir', 
                         help='Output directory in which to store the data', 
                         default='.', 
@@ -159,6 +162,8 @@ def main(args):
         ds.attrs['title'] = sanitise(ds.attrs['title'])
 
     for attr in ['calendar', 'calendar_type']:
+        if args.calendar:
+            ds[timevar].attrs[attr] = args.calendar
         try:
             ds[timevar].attrs[attr] = ds[timevar].attrs[attr].lower()
         except:
