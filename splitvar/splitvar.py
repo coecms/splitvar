@@ -234,7 +234,7 @@ def genfilepath(var):
     and it's frequency
     """
 
-def writevar(var, filename, unlimited=None):
+def writevar(var, filename, unlimited=None, engine='netcdf4'):
     """
     Save variable to netcdf file
     """
@@ -242,9 +242,9 @@ def writevar(var, filename, unlimited=None):
     if unlimited is not None:
         if type(unlimited) is str:
             unlimited = [unlimited]
-        var.to_netcdf(path=filename,format="NETCDF4_CLASSIC", unlimited_dims=unlimited)
+        var.to_netcdf(path=filename,format="NETCDF4", unlimited_dims=unlimited, engine=engine)
     else:
-        var.to_netcdf(path=filename,format="NETCDF4_CLASSIC")
+        var.to_netcdf(path=filename,format="NETCDF4", engine=engine)
 
 
 def open_files(file_paths, freq):

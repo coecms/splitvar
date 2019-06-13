@@ -87,6 +87,10 @@ def parse_args(args):
     parser.add_argument('-cp','--copytimeunits', 
                         help='Copy time units from time variable to bounds', 
                         action='store_true')
+    parser.add_argument('--engine', 
+                        help='Back-end used to write output files (options are netcdf4 and h5netcdf)', 
+                        default='netcdf4', 
+                        action='store')
     parser.add_argument('inputs', help='netCDF files', nargs='+')
 
     return parser.parse_args(args)
@@ -250,7 +254,7 @@ def main(args):
                     pass
 
             fpath = os.path.join(outpath, fname)
-            writevar(dsbytime, fpath, unlimited=timevar)
+            writevar(dsbytime, fpath, unlimited=timevar, engine=args.engine)
         if i == 0:
             # No data written, delete empty output directory
             os.rmdir(outpath)
