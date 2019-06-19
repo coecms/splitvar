@@ -80,6 +80,9 @@ def parse_args(args):
                         const='auto', 
                         nargs='?',
                         action='store')
+    parser.add_argument('--usebounds', 
+                        help='Use mid point of time bounds for time axis', 
+                        action='store_true')
     parser.add_argument('--calendar', 
                         help='Specify calendar: will replace value of calendar attribute whereever it is found', 
                         action='store')
@@ -191,6 +194,12 @@ def main(args):
             shift = float(args.timeshift)
         for var in alltimevars:
             ds[var] = ds[var].copy(data = (ds[var].values[:] - shift))
+            
+    if args.usebounds:
+        if 'bounds' in ds[timevar].attrs:
+            boundsvar = ds[timevar].attrs['bounds']
+            newtime = [(e.values - b.values)//2 + b.values for (b,e) in ds[boundsvar]]
+            ds[timevar] = ds[timevar].copy(data = newtime)
 
     ds = xarray.decode_cf(ds)
 
