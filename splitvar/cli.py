@@ -27,7 +27,9 @@ def parse_args(args):
 
     parser = argparse.ArgumentParser(description='Split multiple netCDF files by time and variable')
 
-    # parser.add_argument('-v','--verbose', help='Verbose output', action='store_true')
+    parser.add_argument('--verbose', 
+                        help='Verbose output', 
+                        action='store_true')
     parser.add_argument('-f','--frequency', 
                         help='Time period to group for output', 
                         default='time.year', 
@@ -117,11 +119,13 @@ def main_argv():
 
 def main(args):
 
-    from dask.distributed import Client
+    verbose = args.verbose
 
-    client = Client()
+    ds = open_files(args.inputs)
 
-    ds = open_files(args.inputs, freq=args.frequency)
+    if verbose: 
+        print('Opened source data:\n')
+        print(ds)
 
     # Find the time coordinate. Will return the first one. Code doesn't
     # support multiple time axes
@@ -222,8 +226,8 @@ def main(args):
         varlist = [var,] + depvars[var]
         dsbyvar = ds[varlist]
         if args.aggregate:
-            dsbyvar = resamplebytime(dsbyvar, var, args.aggregate, timedim='time')
-        for dsbytime in groupbytime(dsbyvar, freq='time.year'):
+            dsbyvar = resamplebytime(dsbyvar, var, args.aggregate, timedim=timevar)
+        for dsbytime in groupbytime(dsbyvar, freq=args.frequency, timedim=timevar):
             i += 1
             startdate = format_date(dsbytime[timevar].values[0], args.timeformat)
             enddate = format_date(dsbytime[timevar].values[-1], args.timeformat)
