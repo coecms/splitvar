@@ -117,6 +117,10 @@ def main_argv():
 
 def main(args):
 
+    from dask.distributed import Client
+
+    client = Client()
+
     ds = open_files(args.inputs, freq=args.frequency)
 
     # Find the time coordinate. Will return the first one. Code doesn't
@@ -266,6 +270,10 @@ def main(args):
                     del(dsbytime.attrs[attr])
                 except KeyError:
                     pass
+
+            dsbytime.chunk({timevar: 1})
+
+            print(dsbytime)
 
             fpath = os.path.join(outpath, fname)
             writevar(dsbytime, fpath, unlimited=timevar, engine=args.engine)
