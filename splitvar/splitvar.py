@@ -63,7 +63,7 @@ def groupbytime(var, freq, timedim='time'):
     Given an xarray variable, split into periods of time defined by freq
     """
     try:
-        for k, v in var.groupby(freq):
+        for k, v in var.resample({timedim: freq}):
             # copyattr(var,v)
             v.attrs.update(var.attrs)
             yield v
@@ -247,7 +247,7 @@ def writevar(var, filename, unlimited=None, engine='netcdf4'):
         var.to_netcdf(path=filename,format="NETCDF4", engine=engine)
 
 
-def open_files(file_paths, freq):
+def open_files(file_paths):
 
     ds = xarray.open_mfdataset(file_paths, 
                                decode_cf=False, 
