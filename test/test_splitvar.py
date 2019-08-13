@@ -85,7 +85,8 @@ def test_splitbytime():
     times = pd.date_range('2000-02-23', '2003-09-13 18:00:00', name='time', freq='1D')
     annual_cycle = np.sin(2 * np.pi * (times.dayofyear / 365.25 - 0.28))
     
-    base = np.array(10 + 15 * np.reshape(annual_cycle,(-1, 1)))
+    base = np.array(np.reshape(np.repeat(10 * 15 * annual_cycle, 3),(-1, 3)))
+    # base = np.repeat(np.array(10 + 15 * np.repeat(annual_cycle)),3,axis=1)
     tmin_values = base + 3 * np.random.randn(annual_cycle.size, 3)
     tmax_values = base + 10 + 3 * np.random.randn(annual_cycle.size, 3)
     
@@ -135,7 +136,8 @@ def test_splitbytime():
     times = pd.date_range('2000-02-23', '2003-09-13 18:00:00', name='time', freq='6H')
     annual_cycle = np.sin(2 * np.pi * (times.dayofyear / 365.25 - 0.28))
     
-    base = np.array(10 + 15 * np.reshape(annual_cycle,(-1, 1)))
+    # base = np.array(10 + 15 * np.reshape(annual_cycle,(-1, 1)))
+    base = np.array(np.reshape(np.repeat(10 * 15 * annual_cycle, 3),(-1, 3)))
     tmin_values = base + 3 * np.random.randn(annual_cycle.size, 3)
     tmax_values = base + 10 + 3 * np.random.randn(annual_cycle.size, 3)
     
