@@ -32,7 +32,7 @@ def parse_args(args):
                         action='store_true')
     parser.add_argument('-f','--frequency', 
                         help='Time period to group for output', 
-                        default='time.year', 
+                        default='Y', 
                         action='store')
     parser.add_argument('--aggregate', 
                         help='Apply mean in time, using pandas frequency notation e.g Y, 6M, 2Y', 
