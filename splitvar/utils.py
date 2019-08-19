@@ -41,9 +41,13 @@ def sanitise(string, replacements={'_' : '-'}):
     return string
 
 def format_date(dateobj, timeformat):
-    # Use pandas as an intermediate as it can grok np.datetime64
-    # as well as standard datetime objects
-    datestring = pd.Timestamp(dateobj).strftime(timeformat)
+
+    try:
+        datestring = dateobj.strftime(timeformat)
+    except:
+        # Use pandas as an intermediate as it can grok np.datetime64
+        # as well as standard datetime objects
+        datestring = pd.Timestamp(dateobj).strftime(timeformat)
 
     return datestring
 
