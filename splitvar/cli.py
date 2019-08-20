@@ -95,6 +95,9 @@ def parse_args(args):
                         help='Output directory in which to store the data', 
                         default='.', 
                         action='store')
+    parser.add_argument('--overwrite', 
+                        help='Overwrite output file if it already exists', 
+                        action='store_true')
     parser.add_argument('-cp','--copytimeunits', 
                         help='Copy time units from time variable to bounds', 
                         action='store_true')
@@ -244,6 +247,11 @@ def main(args):
                         fromdate=startdate,
                         todate=enddate,
                      )
+            fpath = os.path.join(outpath, fname)
+            if os.path.exists(fpath) and not args.overwrite:
+                print("Output file {} already exists, and --overwrite not enabled. Skipping".format(fpath))
+                continue
+
             dsbytime.attrs['time_coverage_start'] = startdate
             dsbytime.attrs['time_coverage_end'] = enddate
 
@@ -278,11 +286,8 @@ def main(args):
                 except KeyError:
                     pass
 
-            dsbytime.chunk({timevar: 1})
-
             print(dsbytime)
 
-            fpath = os.path.join(outpath, fname)
             writevar(dsbytime, fpath, unlimited=timevar, engine=args.engine)
         if i == 0:
             # No data written, delete empty output directory
