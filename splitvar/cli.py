@@ -85,6 +85,9 @@ def parse_args(args):
     parser.add_argument('--usebounds', 
                         help='Use mid point of time bounds for time axis', 
                         action='store_true')
+    parser.add_argument('--datefrombounds', 
+                        help='Use time bounds for filename datestamp', 
+                        action='store_true')
     parser.add_argument('--calendar', 
                         help='Specify calendar: will replace value of calendar attribute whereever it is found', 
                         action='store')
@@ -231,7 +234,7 @@ def main(args):
             i += 1
             startdate = format_date(dsbytime[timevar].values[0], args.timeformat)
             enddate = format_date(dsbytime[timevar].values[-1], args.timeformat)
-            if 'bounds' in dsbytime[timevar].attrs:
+            if 'bounds' in dsbytime[timevar].attrs and args.datefrombounds:
                 boundsvar = ds[timevar].attrs['bounds']
                 startdate = format_date(dsbytime[boundsvar].values[0][0], args.timeformat)
                 enddate = format_date(dsbytime[boundsvar].values[-1][1], args.timeformat)
