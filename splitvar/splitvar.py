@@ -250,7 +250,11 @@ def writevar(var, filename, unlimited=None, engine='netcdf4'):
 def open_files(file_paths, delvars):
 
     def dropvars(ds):
+        nonlocal delvars
         if delvars:
+            delvars = set(delvars)
+            # Select out only variables that are in the dataset
+            delvars.intersection_update(set(ds.variables))
             ds = ds.drop(delvars)
         return(ds)
 

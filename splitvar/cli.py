@@ -47,7 +47,7 @@ def parse_args(args):
                         action='append')
     parser.add_argument('-x','--x-variables', 
                         default=[],
-                        dest='delvars'
+                        dest='delvars',
                         help='Delete specified variables from input data', 
                         action='append')
     parser.add_argument('-d','--delattr', 
