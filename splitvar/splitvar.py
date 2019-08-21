@@ -247,12 +247,18 @@ def writevar(var, filename, unlimited=None, engine='netcdf4'):
         var.to_netcdf(path=filename,format="NETCDF4", engine=engine)
 
 
-def open_files(file_paths):
+def open_files(file_paths, delvars):
+
+    def dropvars(ds):
+        if delvars:
+            ds = ds.drop(delvars)
+        return(ds)
 
     ds = xarray.open_mfdataset(file_paths, 
                                decode_cf=False, 
                                engine='netcdf4', 
-                               mask_and_scale=True)
+                               mask_and_scale=True,
+                               preprocess=dropvars)
 
     for v in ds:
         if 'chunksizes' in ds[v].encoding:

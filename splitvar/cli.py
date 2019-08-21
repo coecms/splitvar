@@ -46,9 +46,9 @@ def parse_args(args):
                         help='Only extract specified variables', 
                         action='append')
     parser.add_argument('-x','--x-variables', 
-                        dest='skipvars',
                         default=[],
-                        help='Exclude specified variables', 
+                        dest='delvars'
+                        help='Delete specified variables from input data', 
                         action='append')
     parser.add_argument('-d','--delattr', 
                         help='Delete specified global attributes', 
@@ -127,7 +127,7 @@ def main(args):
 
     verbose = args.verbose
 
-    ds = open_files(args.inputs)
+    ds = open_files(args.inputs, args.delvars)
 
     if verbose: 
         print('Opened source data:\n')
