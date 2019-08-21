@@ -252,7 +252,6 @@ def open_files(file_paths):
     ds = xarray.open_mfdataset(file_paths, 
                                decode_cf=False, 
                                engine='netcdf4', 
-                               data_vars='minimal',
                                mask_and_scale=True)
 
     for v in ds:
