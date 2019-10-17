@@ -8,6 +8,7 @@ import os
 import re
 
 import cftime
+import networkx
 import numpy as np
 import pandas as pd
 import sys
@@ -156,22 +157,24 @@ def resamplebytime(ds, var, freq, timedim='time', function=np.mean, copyattrs=Tr
 
     return combined
 
-def splitbyvar(ds,vars=None,skipvars=['time']):
+def splitbyvar(ds, vars=None, skipvars=['time'], verbose=False):
     """
     Given an xarray variable, split into separate variables
     """
     if vars is None:
         vars = set(ds.data_vars)
-    else:
-        vars = set(vars).intersection(set(ds.data_vars))
+    newvars = set(vars).intersection(set(ds.data_vars))
 
     if skipvars is not None:
         for varname in skipvars:
-            vars.discard(varname)
-            vars.discard(varname.upper)
-            vars.discard(varname.lower)
+            newvars.discard(varname)
+            newvars.discard(varname.upper)
+            newvars.discard(varname.lower)
 
-    for var in vars:
+    if verbose: 
+        print("Splitting by variable, skipping: {}".format(newvars.difference(vars)))
+
+    for var in newvars:
         yield var
 
 def getdependents(ds, skip_attrs=['long_name', 'standard_name', 'name', 'description']):
@@ -180,8 +183,34 @@ def getdependents(ds, skip_attrs=['long_name', 'standard_name', 'name', 'descrip
     variable names in value array
     """
     depends = {}
+    skipset = set(skip_attrs)
+
+    G = networkx.DiGraph()
+
+    G.add_nodes_from(ds.variables)
+
+    r = re.compile('|'.join([r"\b{}\b".format(v) for v in ds.variables]), flags=re.I | re.X)
+
+    for var in ds.variables:
+        for attr in ds[var].attrs:
+            if attr in skipset: continue
+            try:
+                match = r.findall(ds[var].attrs[attr])
+                if match:
+                    for vmatch in match:
+                        G.add_edge(var,vmatch)
+            except:
+                pass
+
+        for coord in ds[var].coords:
+            G.add_edge(var,coord)
+
     for var in ds.data_vars:
-        depends[var] = getdependentvars(ds, var, skip_attrs)
+        # depends[var] = getdependentvars(ds, var, skip_attrs)
+        depends[var] = []
+        for (node, deps) in networkx.algorithms.traversal.breadth_first_search.bfs_successors(G, var):
+            depends[var].extend(deps)
+
     return depends
 
 def dependentlookup(depends):
@@ -198,7 +227,6 @@ def getdependentvars(ds, var, skip_attrs=['long_name', 'standard_name', 'name', 
     """
     Find other variables upon which var depends
     """
-
     depvars = set()
     # Cycle through all the variables to be selected
     # and check if they depend on any other variables
@@ -247,7 +275,7 @@ def writevar(var, filename, unlimited=None, engine='netcdf4'):
         var.to_netcdf(path=filename,format="NETCDF4", engine=engine)
 
 
-def open_files(file_paths, delvars):
+def open_files(file_paths, concat_dim, delvars=None, verbose=False, encoding={}):
 
     def dropvars(ds):
         nonlocal delvars
@@ -261,12 +289,18 @@ def open_files(file_paths, delvars):
     ds = xarray.open_mfdataset(file_paths, 
                                decode_cf=False, 
                                engine='netcdf4', 
-                               mask_and_scale=True,
-                               preprocess=dropvars)
+                               data_vars='minimal',
+                               preprocess=dropvars,
+                               parallel=True,
+                               concat_dim=concat_dim)
+
+    if verbose and delvars is not None: 
+        print('Deleted {} from dataset'.format(delvars))
 
     for v in ds:
         if 'chunksizes' in ds[v].encoding:
             ds[v] = ds[v].chunk(ds[v].encoding['chunksizes'])
+        ds[v].encoding.update(encoding)
 
     return ds
 
@@ -292,3 +326,45 @@ def findmatchingvars(ds, att='units', matchstrings=[], ignorecase=True, coords_o
                     matchvars.append(var)
 
     return matchvars
+
+def add_vars(ds, fnames, timevar):
+
+    for fname in fnames:
+        print('Adding {}'.format(fname))
+        add_ds = xarray.open_dataset(fname, decode_cf=False)
+        if timevar in add_ds.coords:
+            delvars = [timevar]
+            for var in add_ds:
+                if timevar in add_ds[var].dims:
+                    delvars.append(var)
+            print('Deleting following variables with a time dimension from {}: {}'.format(fname, delvars))
+            add_ds = add_ds.drop(delvars)
+
+        # Updating the additional dataset means vars from
+        # ds take precedence. Definitely don't want time var
+        # overwritten for example
+        ds = xarray.merge([ds,add_ds])
+    
+    return ds
+
+def make_added_ds(fnames, timevar):
+
+    ds = xarray.Dataset()
+
+    for fname in fnames:
+        print('Adding {}'.format(fname))
+        add_ds = xarray.open_dataset(fname, decode_cf=False)
+        if timevar in add_ds.coords:
+            delvars = [timevar]
+            for var in add_ds:
+                if timevar in add_ds[var].dims:
+                    delvars.append(var)
+            print('Deleting following variables with a time dimension from {}: {}'.format(fname, delvars))
+            add_ds = add_ds.drop(delvars)
+
+        # Updating the additional dataset means vars from
+        # ds take precedence. Definitely don't want time var
+        # overwritten for example
+        ds = ds.combine_first(add_ds)
+
+    return ds

@@ -192,14 +192,13 @@ def test_getdependents():
     depvars = getdependents(ds)
     is_dependent = dependentlookup(depvars)
 
-    # `for k,v in depvars.items():
-    # ``    print(k,v)
-
     for k,v in depvars.items():
         if k in is_dependent:
-            # Dependent vars should have no dependencies
-            assert(len(v) == 0)
+            if k == 'time_bounds':
+                assert(sorted(v) == ['nv', 'time'])
+            else:
+                assert(sorted(v) == ['nv', 'time', 'time_bounds'])
         else:
             # Non dependent vars should all have the same dependencies
-            assert(sorted(v) == ['average_DT', 'average_T1', 'average_T2', 'time', 'time_bounds'])
+            assert(sorted(v) == ['average_DT', 'average_T1', 'average_T2', 'nv', 'scalar_axis', 'time', 'time_bounds'])
 

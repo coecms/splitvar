@@ -63,25 +63,20 @@ def parse_args(args):
                         default=['time'], 
                         action='append')
     parser.add_argument('-t','--title', 
-                        help='Title of the simulation, included in metadata', 
-                        action='store')
+                        help='Title of the simulation, included in metadata')
     parser.add_argument('--simname', 
-                        help='Simulation name to include in the filename', 
-                        action='store')
+                        help='Simulation name to include in the filename')
     parser.add_argument('--model-type', 
                         dest='modeltype',
                         help='Model type to include in the filename', 
-                        default='',
-                        action='store')
+                        default='')
     parser.add_argument('--timeformat', 
                         help='strftime format string for date fields in filename', 
-                        default='%Y%m', 
-                        action='store')
+                        default='%Y%m')
     parser.add_argument('--timeshift', 
                         help='Shift time axis by specified amount (in whatever units are used in the file). Default is to automatically shift current start date to time origin', 
                         const='auto', 
-                        nargs='?',
-                        action='store')
+                        nargs='?')
     parser.add_argument('--usebounds', 
                         help='Use mid point of time bounds for time axis', 
                         action='store_true')
@@ -89,12 +84,10 @@ def parse_args(args):
                         help='Use time bounds for filename datestamp', 
                         action='store_true')
     parser.add_argument('--calendar', 
-                        help='Specify calendar: will replace value of calendar attribute whereever it is found', 
-                        action='store')
+                        help='Specify calendar: will replace value of calendar attribute whereever it is found')
     parser.add_argument('-o','--outputdir', 
                         help='Output directory in which to store the data', 
-                        default='.', 
-                        action='store')
+                        default='.')
     parser.add_argument('--overwrite', 
                         help='Overwrite output file if it already exists', 
                         action='store_true')
@@ -103,8 +96,14 @@ def parse_args(args):
                         action='store_true')
     parser.add_argument('--engine', 
                         help='Back-end used to write output files (options are netcdf4 and h5netcdf)', 
-                        default='netcdf4', 
-                        action='store')
+                        default='netcdf4')
+    parser.add_argument('--deflate', 
+                        help='Deflate compression level', 
+                        default=5, 
+                        choices=range(0, 10))
+    parser.add_argument('--filecachesize', 
+                        help='Number of files xarray keeps in cache. For large datasets this may need to be set to a lower value to avoid excessive memory use (default=128)', 
+                        type=int)
     parser.add_argument('inputs', help='netCDF files', nargs='+')
 
     return parser.parse_args(args)
@@ -127,32 +126,26 @@ def main(args):
 
     verbose = args.verbose
 
-    ds = open_files(args.inputs, args.delvars)
+    if args.filecachesize:
+        xarray.set_options(file_cache_maxsize=args.filecachesize)
 
-    if verbose: 
-        print('Opened source data:\n')
-        print(ds)
+    # Open first file in series to determine dependencies and variables
+    # needed to load the full dataset. Don't specify delvars on open,
+    # delete after
+    ds = xarray.open_dataset(args.inputs[0], decode_cf=False).drop(args.delvars)
 
     # Find the time coordinate. Will return the first one. Code doesn't
     # support multiple time axes
-    timevar = findmatchingvars(ds, matchstrings=[' since '], coords_only=True)[0]
-    print('Found time coordinate: {}'.format(timevar))
+    try:
+        timevar = findmatchingvars(ds, matchstrings=[' since '], coords_only=True)[0]
+    except IndexError:
+        print('No time coordinate found! Aborting')
+        raise
+    if verbose: print('Found time coordinate: {}'.format(timevar))
 
-    for fname in args.add:
-        print('Adding {}'.format(fname))
-        add_ds = xarray.open_dataset(fname, decode_cf=False)
-        if timevar in add_ds.coords:
-            delvars = [timevar]
-            for var in add_ds:
-                if timevar in add_ds[var].dims:
-                    delvars.append(var)
-            print('Deleting following variables with a time dimension from {}: {}'.format(fname, delvars))
-            add_ds = add_ds.drop(delvars)
-
-        # Updating the additional dataset means vars from
-        # ds take precedence. Definitely don't want time var
-        # overwritten for example
-        ds = ds.combine_first(add_ds)
+    # Add additional variables, such as grid information. Need to add
+    # at this stage to properly determing dependencies
+    ds = add_vars(ds, args.add, timevar)
 
     # Create a dictionary we can use to find dependent vars
     # for a given variable
@@ -162,20 +155,49 @@ def main(args):
     # depend on them
     is_dependent = dependentlookup(depvars)
 
+    # Grab the list of variables required for output default to all 
+    # data variables in the dataset if none specified
+    variables = args.variables
+    if variables is None:
+        variables = set(ds.variables)
+    else:
+        variables = set(variables).intersection(set(ds.variables))
+        # Add back in dependent variables. Loop over list(variables) as
+        # variables is being modified
+        for var in list(variables):
+            variables.update(depvars[var])
+    
+    # Remove variables specified to be deleted. Useful for removing
+    # variables which can then be updated globally, e.g. grid variables
+    # that change during a run, but should be defined to be one value
+    variables.difference_update(args.delvars)
+
+    # Check encoding options
+    if args.deflate > 0:
+        encoding = { 'zlib': True, 'shuffle': True, 'complevel': args.deflate }
+    else:
+        encoding = {}
+
+    # Open full dataset and exclude all variables that aren't
+    # in vars
+    ds = open_files(args.inputs, timevar, set(ds.variables).difference(variables), verbose, encoding)
+
+    # Add auxiliary data
+    ds = add_vars(ds, args.add, timevar)
+
+    if verbose: 
+        print('Opened source data:\n')
+        print(ds)
+
     if args.simname:
         ds.attrs['simname'] = args.simname
-
     if 'simname' not in ds.attrs:
         ds.attrs['simname'] = 'simname'
-
     ds.attrs['simname'] = sanitise(ds.attrs['simname'])
 
     if args.title:
         ds.attrs['title'] = args.title
-
     if 'title' in ds.attrs:
-        if ds.attrs['title'] is None:
-            ds.attrs['title'] = ds.attrs['title']
         ds.attrs['title'] = sanitise(ds.attrs['title'])
 
     for attr in ['calendar', 'calendar_type']:
@@ -196,9 +218,8 @@ def main(args):
             boundsvar = ds[timevar].attrs['bounds']
             ds[boundsvar].attrs['units'] = ds[timevar].attrs['units']
 
-    alltimevars = findmatchingvars(ds, matchstrings=[' since '])
-
     if args.timeshift:
+        # Apply a timeshift to all variables with a time axis
         if args.timeshift == 'auto':
             if boundsvar is not None:
                 shift = ds[boundsvar].values[0][0]
@@ -206,10 +227,13 @@ def main(args):
                 shift = ds[timevar].values[0]
         else:
             shift = float(args.timeshift)
-        for var in alltimevars:
+        for var in findmatchingvars(ds, matchstrings=[' since ']):
             ds[var] = ds[var].copy(data = (ds[var].values[:] - shift))
             
     if args.usebounds:
+        # Replace time variable with the average of the time bounds. Useful
+        # for time variables that are defined at the end of a month, rather
+        # than the middle 
         if 'bounds' in ds[timevar].attrs:
             boundsvar = ds[timevar].attrs['bounds']
             newtime = [(e.values - b.values)//2 + b.values for (b,e) in ds[boundsvar]]
@@ -220,7 +244,7 @@ def main(args):
     # Add all dependent variables to the skipvar list
     skipvars = set(args.skipvars + list(is_dependent.keys()))
 
-    for var in splitbyvar(ds, args.variables, skipvars):
+    for var in splitbyvar(ds, args.variables, skipvars, verbose):
         i = 0
         print('Splitting {var} by time'.format(var=var))
         name = sanitise(var)

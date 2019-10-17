@@ -23,6 +23,7 @@ requirements:
         - libnetcdf
         - pandas
         - xarray
+        - networkx
 
 test:
     source_files:

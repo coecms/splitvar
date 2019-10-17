@@ -61,3 +61,6 @@ target/
 
 # Databases
 *.db
+
+# netCDF files
+*.nc
