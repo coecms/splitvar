@@ -132,7 +132,7 @@ def main(args):
     # Open first file in series to determine dependencies and variables
     # needed to load the full dataset. Don't specify delvars on open,
     # delete after
-    ds = xarray.open_dataset(args.inputs[0], decode_cf=False).drop(args.delvars)
+    ds = open_files(args.inputs[0], None, args.delvars)
 
     # Find the time coordinate. Will return the first one. Code doesn't
     # support multiple time axes
