@@ -4,3 +4,4 @@ pandas
 numpy
 xarray
 networkx
+dask
