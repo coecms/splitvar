@@ -28,9 +28,12 @@ The servers responsible for web publishing have limits on the size and number of
 they are capable of serving.
 
 `splitvar` is a python program which can be used in a publishing pipeline to split
-aggregated model output into separate files by variale and time span.
+aggregated model output into separate files by variale and time span. It examines
+attributes to find any dependent variables.  
 
-## Usage
+## Program Invocation
+
+### Usage
 
 `splitvar` is  a command line program. Invoking with `-h` prints the help output
 explaining all the command line options:
@@ -96,8 +99,10 @@ explaining all the command line options:
                             datasets this may need to be set to a lower value to
                             avoid excessive memory use (default=128)
 
-As an example, the file `ocean.nc` contains 5 years of dailt data from a 
-1 degree global MOM5 ocean data for the following variables
+### Simple example
+
+As an example, the file `ocean_daily.nc` contains 5 years of daily data from a 
+1 degree global MOM5 ocean for the following variables
 
     ocean_daily.nc
     Time steps:  1826  x  1.0 days
@@ -130,14 +135,16 @@ is to conform to standard naming procedures for published data.
 The global attribute `title` was deleted using the `-d` option. The calendar for the 
 time variable was also changed to `proleptic_gregorian`.
 
-To just extract specified variables used the `-v` option. Use it multiple times to
+### Choosing variables
+
+Specific variables can be extracted with the `-v` option. Use it multiple times to
 specify more than one variable. To change the grouping frequency use the `-f` option,
 and specify a pandas [date offset frequency string](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#dateoffset-objects).
 
+    $ splitvar -cp -d title --calendar proleptic_gregorian --simname ACCESS-OM2 -f 6MS -v     
+      surface_temp -v mld ocean_daily.nc 
 
-    $ splitvar -cp -d title --calendar proleptic_gregorian --simname ACCESS-OM2 -f 6MS -v surface_temp -v mld ocean_daily.nc 
-
-so in this case only files for the two specified variables are produced:
+In this case only files for the two specified variables are produced:
 
     $ ls ACCESS-OM2/
     mld  surface-temp
@@ -151,11 +158,17 @@ and for each variable there are now ten files
     surface-temp_ACCESS-OM2_225407_225412.nc  surface-temp_ACCESS-OM2_225701_225706.nc
     surface-temp_ACCESS-OM2_225501_225506.nc  surface-temp_ACCESS-OM2_225707_225712.nc
 
-each containing six months of data
+each containing six months of daily data
 
     ACCESS-OM2/surface-temp/surface-temp_ACCESS-OM2_225301_225306.nc
     Time steps:  181  x  1.0 days
     surface_temp :: (181, 300, 360) :: Conservative temperature
+
+If there are a large number of variables to be extracted and only a few are *not* required
+then it can be easier to specify the variables to skip, with the `-s` option, rather than 
+all the variables to process.
+
+### Aggregation
 
 `splitvar` can also aggregate data on a specified time frequency by specifying an aggregate
 frequency. For example, using the same command as above, but specifying monthly
@@ -163,7 +176,8 @@ aggregation
 
     $ splitvar -cp -d title --calendar proleptic_gregorian --simname ACCESS-OM2 -f 6MS -v surface_temp --aggregate M ocean_daily.nc
 
-results in the same number of tiles, but each now only has 6 records
+results in the same number of tiles, but each now only has six records, which is the
+monthly average temperature
 
     ACCESS-OM2/surface-temp/surface-temp_ACCESS-OM2_225301_225306.nc
     Time steps:  6  x  28.0 days
@@ -171,14 +185,12 @@ results in the same number of tiles, but each now only has 6 records
 
 currently the only aggregation function available is mean.
 
-If there are a large number of variables to be extracted and only a few are *not* required
-then it can be easier to specify the variables to skip, with the `-s` option, rather than 
-all the variables to process.
+### Multiple inputs
 
 If multiple input files are specified on the command line they are concatenated together
 and treated as a single dataset.
 
-For example, from the same ACCESS-OM2 simulation the ice model outputs each month of daily
+For example, from the same ACCESS-OM2 simulation the ice model outputs each month of monthly
 data to a separate file
 
     iceh.2253-01.nc  iceh.2253-11.nc  iceh.2254-09.nc  iceh.2255-07.nc  iceh.2256-05.nc  iceh.2257-03.nc
@@ -196,15 +208,19 @@ By using a pattern matching `glob` all the files can be passed to `splitvar`
 
     $ splitvar --simname ACCESS-OM2 --usebounds -v aice_m iceh.225*.nc
 
-note that this also uses the `--usebounds` option as the dates in the ice data
-fall at the end of the month, and this option uses the average of the time bounds
-to create a new time axis that can be resampled correctly. The result is five 
-files with a year of data in each
+The dates in the time coordinate in the ice data file are the value of end time bound 
+of the month, which is actually the beginning of the next month! The resampling
+method doesn't give the desired result in this case. Specifying the `--usebounds` 
+option creates a new time axis that is the midpoint of the time bounds variable.
+This can be resampled correctly. As only the ice area variable, `aice_m`, was 
+specified the result is five files 
 
     $ ls ACCESS-OM2/aice-m/
     aice-m_ACCESS-OM2_225301_225312.nc  aice-m_ACCESS-OM2_225601_225612.nc  
     aice-m_ACCESS-OM2_225401_225412.nc  aice-m_ACCESS-OM2_225701_225712.nc
     aice-m_ACCESS-OM2_225501_225512.nc
+
+with a year of monthly data in each
 
     ACCESS-OM2/aice-m/aice-m_ACCESS-OM2_225301_225312.nc
     Time steps:  12  x  30.0 days
@@ -212,3 +228,68 @@ files with a year of data in each
     TLON   :: (300, 360)     :: T grid center longitude
     TLAT   :: (300, 360)     :: T grid center latitude
     tarea  :: (300, 360)     :: area of T grid cells
+
+So in this case the output files have longer time spans than the input. In 
+this way splitvar is flexible, it can take short spans and make them longer,
+or long spans and make them shorter. Any number of files can be specified
+as input, within memory limits. The files have to contain the same variables
+and time axis, but can themselves contain different time spans. This can
+occur when models are run for different lengths of time.
+
+### Output path options
+
+For multi-model simulations the convention is to store data by model type.
+`splitvar` has the `--model-type` option to support this. If this is specified
+the string supplied to the option is inserted into the path for saving the
+variable. There is also a `-o` option for specifying an output path to prepend.
+For example
+
+    $ splitvar -o outputs/models --model-type ice --simname ACCESS-OM2 --usebounds 
+      -v aice_m iceh.225*.nc
+
+creates the following files and directory structure
+
+    $ tree outputs
+    outputs
+    `-- models
+        `-- ACCESS-OM2
+            `-- ice
+                `-- aice-m
+                    |-- aice-m_ACCESS-OM2_225301_225312.nc
+                    |-- aice-m_ACCESS-OM2_225401_225412.nc
+                    |-- aice-m_ACCESS-OM2_225501_225512.nc
+                    |-- aice-m_ACCESS-OM2_225601_225612.nc
+                    `-- aice-m_ACCESS-OM2_225701_225712.nc
+
+    4 directories, 5 files
+
+### Compression
+
+By default `splitvar` will use the same compression settings as the input data
+sets. In cases where the input data is not compressed, or the deflate level
+needs to be changed, this can be overidden with the `--deflate` option.
+
+### Adding and deleting variables
+
+It may be that extra variables need to be added to every output file. For
+example, in some cases full model grid information is not included in every output file
+in order to save space. Variables from another file can be added to all of the generated
+output files using the `-a` option. The argument to the option is a path to a netCDF file.
+All variables from that file, except time coordinates, will be added to each output file.
+
+In some cases it may be necessary to delete variables from the input files. For example,
+if grid information is included in the model output files, but is not **identical** for
+across all input files, the variable will be converted into a time varying variable. This
+may be considered undesirable. In this case the grid variables can be deleted with the
+`-x` option, and a time invariant grid added back using `-a`.
+
+## Conclusion
+
+`skipvar` relies almost exclusively on the excellent [xarray](http://xarray.pydata.org/en/stable/) python library. For very large data sets memory
+limitations imposed by the architecture of the underlying libraries can mean `splitvar`
+cannot be used naively. For example the input data sets may need to be processed in small 
+groupings, processed one variable at atime.
+
+A [real-world example](https://github.com/aidanheerdegen/publish_cosima_data) of processing 
+a suite of model ouputs from three different resolutions, 1, 0.25 and 0.1 degree, gives an 
+example of some of the approaches required. 
