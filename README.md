@@ -13,7 +13,7 @@ A conda package is available in the coecms channel
 
 Install directly from source
 
-    git checkout git+https://github.com/coecms/splitvar
+    git clone https://github.com/coecms/splitvar
     cd splitvar
     pip install .
 
