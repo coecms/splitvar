@@ -94,6 +94,9 @@ def parse_args(args):
     parser.add_argument('-cp','--copytimeunits', 
                         help='Copy time units from time variable to bounds', 
                         action='store_true')
+    parser.add_argument('--makecoords', 
+                        help='Create variable for any dimension without corresponding coordinate variable as per CF convention',
+                        action='store_true')
     parser.add_argument('--engine', 
                         help='Back-end used to write output files (options are netcdf4 and h5netcdf)', 
                         default='netcdf4')
@@ -238,6 +241,12 @@ def main(args):
             boundsvar = ds[timevar].attrs['bounds']
             newtime = [(e.values - b.values)//2 + b.values for (b,e) in ds[boundsvar]]
             ds[timevar] = ds[timevar].copy(data = newtime)
+
+    if args.makecoords:
+        # Loop over all dimensions without coordinates and make a
+        # variable that is the dimension indexed by itself
+        for var in set(ds.dims.keys()).difference(set(ds.coords.keys())):
+            ds[var] = xr.DataArray(ds[var], coords={var:ds[var]})   
 
     ds = xarray.decode_cf(ds)
 
