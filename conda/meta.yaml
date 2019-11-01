@@ -27,8 +27,7 @@ requirements:
         - xarray
         - networkx
         - cftime==1.0.3.4
-        - dask
-        - delayed
+        - dask delayed
 
 
 test:
