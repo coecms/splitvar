@@ -5,4 +5,4 @@ numpy
 xarray
 networkx
 dask
-cftime=1.0.3.4 
+cftime==1.0.3.4 
