@@ -26,6 +26,10 @@ requirements:
         - pandas
         - xarray
         - networkx
+        - cftime==1.0.3.4
+        - dask 
+        - distributed
+
 
 test:
     source_files:

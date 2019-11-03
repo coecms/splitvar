@@ -22,17 +22,19 @@ limitations under the License.
 
 from __future__ import print_function
 
+import copy
+import os
+from pathlib import Path
 import pytest
 import sys
-import os
 import shutil
 import subprocess
 import shlex
-import copy
+
 import netCDF4 as nc
-import xarray as xr
-import pandas as pd
 import numpy as np
+import pandas as pd
+import xarray as xr
 
 from pandas.tseries.frequencies import to_offset
 
@@ -41,6 +43,7 @@ sys.path.append('..')
 sys.path.append('.')
 
 from splitvar import *
+import splitvar.cli
 
 verbose = True
 
@@ -162,18 +165,54 @@ def test_splitbyvariable():
 
     testfile = 'test/ocean_scalar.nc'
     ds = xr.open_dataset(testfile,decode_times=False)
-    ds['time'] = nc.num2date(ds.time, 'days since 1678-01-01 00:00:00', 'noleap')
+    ds['time'] = nc.num2date(ds.time, 'days since 1900-01-01 00:00:00', 'noleap')
+
+    ds = xr.decode_cf(ds)
 
     ds2 = ds['temp_global_ave']
 
-    i = 0
+    outdir = Path('test') / 'splitbyvar' 
+    outdir.mkdir(exist_ok=True)
     for var in splitbyvar(ds,['salt_global_ave','temp_global_ave']):
-        print(var)
+        i = 0
         for varbytime in splitbytime(ds[var],'24MS'):
             i += 1
-            fname = "{}_{}.nc".format(var,i)
-            print(varbytime.shape,fname)
-            writevar(varbytime,fname)
+            fname = outdir / "{}_{}.nc".format(var,i)
+            # print(varbytime.shape,fname)
+            writevar(varbytime,str(fname))
+
+    for var in ['salt_global_ave','temp_global_ave']:
+        assert(len(list(outdir.glob('{var}_*.nc'.format(var=var)))) == 7)
+
+def test_missingcoord():
+
+    testfile = 'test/ocean_scalar.nc'
+    ds = xr.open_dataset(testfile,decode_times=False)
+    ds['time'] = nc.num2date(ds.time, 'days since 1900-01-01 00:00:00', 'noleap')
+
+    ds = xr.decode_cf(ds)
+
+    ds = ds[['pe_tot','total_ocean_salt']]
+
+    # Drop a coordinate (keeps dimension)
+    ds = ds.drop('scalar_axis')
+
+    testfile = 'test/nocoord.nc'
+    writevar(ds.sel(time=slice('1955','1960')), testfile)
+
+    splitvar.cli.main_parse_args(shlex.split('-v total_ocean_salt -f 24MS -o test {}'.format(testfile)))
+
+    dstmp = xr.open_dataset('test/simname/total-ocean-salt/total-ocean-salt_simname_195901_196012.nc')
+    assert('scalar_axis' not in dstmp.coords)
+
+    dstmp.close()
+    
+    splitvar.cli.main_parse_args(shlex.split('--overwrite --makecoords -v total_ocean_salt -f 24MS -o test {}'.format(testfile)))
+
+    dstmp = xr.open_dataset('test/simname/total-ocean-salt/total-ocean-salt_simname_195901_196012.nc')
+    assert('scalar_axis' in dstmp.coords)
+    
+    dstmp.close()
 
 def test_findmatchingvars():
 
