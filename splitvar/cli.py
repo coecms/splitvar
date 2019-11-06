@@ -150,6 +150,13 @@ def main(args):
     # at this stage to properly determing dependencies
     ds = add_vars(ds, args.add, timevar)
 
+    # Need this step to make sure the dependencies are correct later
+    if args.makecoords:
+        # Loop over all dimensions without coordinates and make a
+        # variable that is the dimension indexed by itself
+        for var in set(ds.dims.keys()).difference(set(ds.coords.keys())):
+            ds[var] = xr.DataArray(ds[var], coords={var:ds[var]})   
+
     # Create a dictionary we can use to find dependent vars
     # for a given variable
     depvars = getdependents(ds)
