@@ -279,25 +279,32 @@ def main(args):
             dsbyvar = resamplebytime(dsbyvar, var, args.aggregate, timedim=timevar)
         for dsbytime in groupbytime(dsbyvar, freq=args.frequency, timedim=timevar):
             i += 1
-            startdate = format_date(dsbytime[timevar].values[0], args.timeformat)
-            enddate = format_date(dsbytime[timevar].values[-1], args.timeformat)
+            startdate = dsbytime[timevar].values[0]
+            enddate = dsbytime[timevar].values[-1]
             if 'bounds' in dsbytime[timevar].attrs and args.datefrombounds:
                 boundsvar = ds[timevar].attrs['bounds']
-                startdate = format_date(dsbytime[boundsvar].values[0][0], args.timeformat)
-                enddate = format_date(dsbytime[boundsvar].values[-1][1], args.timeformat)
+                startdate = dsbytime[boundsvar].values[0][0]
+                enddate = dsbytime[boundsvar].values[-1][1]
+
+            # Set time coverage metadata
+            dsbytime.attrs['time_coverage_start'] = format_date(startdate, '%Y%m%d')
+            dsbytime.attrs['time_coverage_end'] = format_date(enddate,'%Y%m%d')
+
+            # Format time extents for filename
+            startdate = format_date(startdate, args.timeformat)
+            enddate = format_date(enddate, args.timeformat)
+
             fname = '{name}_{simulation}_{fromdate}_{todate}.nc'.format(
                         name=name,
                         simulation=ds.attrs['simname'],
                         fromdate=startdate,
                         todate=enddate,
                      )
+
             fpath = os.path.join(outpath, fname)
             if os.path.exists(fpath) and not args.overwrite:
                 print("Output file {} already exists, and --overwrite not enabled. Skipping".format(fpath))
                 continue
-
-            dsbytime.attrs['time_coverage_start'] = startdate
-            dsbytime.attrs['time_coverage_end'] = enddate
 
             dsbytime.attrs['geospatial_lat_min'] =  99999.
             dsbytime.attrs['geospatial_lat_max'] = -99999.
