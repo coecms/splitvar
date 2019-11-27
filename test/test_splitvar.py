@@ -187,12 +187,12 @@ def test_splitbyvariable():
 def test_missingcoord():
 
     testfile = 'test/ocean_scalar.nc'
-    ds = xr.open_dataset(testfile,decode_times=False)
+    ds = xr.open_dataset(testfile, decode_times=False)
     ds['time'] = nc.num2date(ds.time, 'days since 1900-01-01 00:00:00', 'noleap')
 
-    ds = xr.decode_cf(ds)
-
     ds = ds[['pe_tot','total_ocean_salt']]
+
+    ds = xr.decode_cf(ds)
 
     # Drop a coordinate (keeps dimension)
     ds = ds.drop('scalar_axis')
@@ -200,7 +200,7 @@ def test_missingcoord():
     testfile = 'test/nocoord.nc'
     writevar(ds.sel(time=slice('1955','1960')), testfile)
 
-    splitvar.cli.main_parse_args(shlex.split('-v total_ocean_salt -f 24MS -o test {}'.format(testfile)))
+    splitvar.cli.main_parse_args(shlex.split('--overwrite -v total_ocean_salt -f 24MS -o test {}'.format(testfile)))
 
     dstmp = xr.open_dataset('test/simname/total-ocean-salt/total-ocean-salt_simname_195901_196012.nc')
     assert('scalar_axis' not in dstmp.coords)
@@ -211,6 +211,7 @@ def test_missingcoord():
 
     dstmp = xr.open_dataset('test/simname/total-ocean-salt/total-ocean-salt_simname_195901_196012.nc')
     assert('scalar_axis' in dstmp.coords)
+    assert(dstmp.coords['scalar_axis'].values.dtype == np.float32)
     
     dstmp.close()
 
