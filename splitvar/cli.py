@@ -278,7 +278,11 @@ def main(args):
         # Drop any variables xarray has automatically added that are not
         # superfluous. Especially important to not get spurious/confusing 
         # coordinates
-        dsbyvar = dsbyvar.drop(set(dsbyvar.variables).difference(varlist))
+        try:
+            dsbyvar = dsbyvar.drop_vars(set(dsbyvar.variables).difference(varlist))
+        except AttributeError:
+            dsbyvar = dsbyvar.drop(set(dsbyvar.variables).difference(varlist))
+
         if args.aggregate:
             dsbyvar = resamplebytime(dsbyvar, var, args.aggregate, timedim=timevar)
         for dsbytime in groupbytime(dsbyvar, freq=args.frequency, timedim=timevar):
