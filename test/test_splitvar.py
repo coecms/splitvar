@@ -194,8 +194,12 @@ def test_missingcoord():
 
     ds = xr.decode_cf(ds)
 
-    # Drop a coordinate (keeps dimension)
-    ds = ds.drop('scalar_axis')
+    # Drop a coordinate (keeps dimension). Use try/except to 
+    # account for differences in xarray versions
+    try:
+        ds = ds.drop_vars('scalar_axis')
+    except AttributeError:
+        ds = ds.drop('scalar_axis')
 
     testfile = 'test/nocoord.nc'
     writevar(ds.sel(time=slice('1955','1960')), testfile)
