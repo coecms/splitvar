@@ -283,7 +283,10 @@ def open_files(file_paths, concat_dim, delvars=None, verbose=False, encoding={})
             delvars = set(delvars)
             # Select out only variables that are in the dataset
             delvars.intersection_update(set(ds.variables))
-            ds = ds.drop(delvars)
+            try:
+                ds = ds.drop_vars(delvars)
+            except AttributeError:
+                ds = ds.drop(delvars)
         return(ds)
 
     ds = xarray.open_mfdataset(file_paths, 

@@ -155,7 +155,9 @@ def main(args):
         # Loop over all dimensions without coordinates and make a
         # variable that is the dimension indexed by itself
         for var in set(ds.dims.keys()).difference(set(ds.coords.keys())):
-            ds[var] = xr.DataArray(ds[var], coords={var:ds[var]})   
+            ds[var] = xr.DataArray(ds[var].values.astype(dtype=np.float32), 
+                                   coords={var:ds[var].values.astype(dtype=np.float32)}, 
+                                   dims=[var])
 
     # Create a dictionary we can use to find dependent vars
     # for a given variable
@@ -253,7 +255,9 @@ def main(args):
         # Loop over all dimensions without coordinates and make a
         # variable that is the dimension indexed by itself
         for var in set(ds.dims.keys()).difference(set(ds.coords.keys())):
-            ds[var] = xr.DataArray(ds[var], coords={var:ds[var]})   
+            ds[var] = xr.DataArray(ds[var].values.astype(dtype=np.float32), 
+                                   coords={var:ds[var].values.astype(dtype=np.float32)}, 
+                                   dims=[var])
 
     ds = xarray.decode_cf(ds)
 
@@ -274,7 +278,11 @@ def main(args):
         # Drop any variables xarray has automatically added that are not
         # superfluous. Especially important to not get spurious/confusing 
         # coordinates
-        dsbyvar = dsbyvar.drop(set(dsbyvar.variables).difference(varlist))
+        try:
+            dsbyvar = dsbyvar.drop_vars(set(dsbyvar.variables).difference(varlist))
+        except AttributeError:
+            dsbyvar = dsbyvar.drop(set(dsbyvar.variables).difference(varlist))
+
         if args.aggregate:
             dsbyvar = resamplebytime(dsbyvar, var, args.aggregate, timedim=timevar)
         for dsbytime in groupbytime(dsbyvar, freq=args.frequency, timedim=timevar):
