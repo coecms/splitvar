@@ -6,4 +6,4 @@ xarray
 networkx
 dask
 distributed
-cftime>=1.0.3.4 
+cftime
